@@ -175,3 +175,32 @@ re-add them with **Auto Confirm User** ticked.
 
 **Blank page** — open the browser console. If it complains about modules, you
 opened `index.html` directly; serve it over HTTP instead.
+
+**Push fails: `Permission to ... denied to Don-Walter` (403)** — the token
+authenticated but isn't allowed to write. Note the difference: bad credentials
+give you `Invalid username or password`, so a 403 means the token is *valid* and
+simply lacks permission.
+
+Almost always a **fine-grained** token (one starting `github_pat_`). These grant
+nothing by default — both of the following must be set, and missing either one
+produces exactly this error:
+
+| Setting | Required value |
+|---|---|
+| Resource owner | `Don-Walter` |
+| Repository access | *All repositories*, or *Only select repositories* **including `leads-management-system-`** |
+| Permissions → Repository → **Contents** | **Read and write** |
+
+`Contents: Read and write` is the one people miss — read-only is the default and
+it lets you clone but not push. Metadata: Read-only is added automatically.
+
+Note that a fine-grained token scoped to *selected repositories* does not cover
+repos created after it was issued; you have to go back and add them.
+
+Edit an existing token at <https://github.com/settings/tokens?type=beta> — the
+permission change takes effect immediately, no reissue needed.
+
+A classic token (<https://github.com/settings/tokens/new>) with the single `repo`
+scope also works and has fewer moving parts, but it grants access to *every*
+repository on the account. The fine-grained one, scoped to this repo alone, is
+the better choice for a public project.
