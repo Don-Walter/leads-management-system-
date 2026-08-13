@@ -41,14 +41,27 @@ To go live, follow [docs/SETUP.md](docs/SETUP.md).
 ## Layout
 
 ```
-index.html              app shell + login gate
-assets/css/app.css      styling (light + dark)
-assets/js/config.js     Supabase URL + anon key
-assets/js/store.js      data layer — Supabase or localStorage
-assets/js/app.js        UI, rendering, event wiring
-supabase/schema.sql     tables, enums, triggers, RLS policies
-docs/SETUP.md           Supabase + GitHub Pages setup
+index.html                app shell + login gate
+assets/css/app.css        styling (light + dark)
+assets/js/config.js       Supabase URL + anon key
+assets/js/store.js        data layer — Supabase or localStorage
+assets/js/app.js          UI, rendering, event wiring
+supabase/schema.sql       tables, enums, triggers, RLS policies
+scripts/build-config.js   regenerates config.js from env vars at deploy time
+vercel.json               Vercel build command + security headers
+docs/SETUP.md             Supabase + GitHub Pages setup
+docs/VERCEL.md            Vercel deployment + environment variables
 ```
+
+## Deploying
+
+Works on **GitHub Pages** (no config — see [docs/SETUP.md](docs/SETUP.md)) or
+**Vercel** (see [docs/VERCEL.md](docs/VERCEL.md)).
+
+Environment variables are optional. There's no framework here, so the browser
+can't read them — `scripts/build-config.js` writes them into `config.js` during
+the Vercel build. With none set, the committed config is used as-is and local
+development is unaffected.
 
 ## Security
 
