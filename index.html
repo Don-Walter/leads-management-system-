@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Podcast Client Tracker</title>
+<link rel="stylesheet" href="assets/css/app.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>" />
+<script src="assets/js/config.js"></script>
+</head>
+<body>
+
+<!-- ========== login gate ========== -->
+<section id="login-view" class="login-view" hidden>
+  <form class="login-card" id="login-form">
+    <div class="login-mark">🎙️</div>
+    <h1>Podcast Client Tracker</h1>
+    <p class="login-sub">Admin sign in</p>
+
+    <label for="login-email">Email</label>
+    <input id="login-email" type="email" autocomplete="username" required />
+
+    <label for="login-password">Password</label>
+    <input id="login-password" type="password" autocomplete="current-password" required />
+
+    <button type="submit" class="btn btn-primary btn-block" id="login-submit">Sign in</button>
+    <p class="form-error" id="login-error" hidden></p>
+    <p class="login-mode" id="login-mode"></p>
+  </form>
+</section>
+
+<!-- ========== app ========== -->
+<div id="app-view" hidden>
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="brand">🎙️ Podcast Tracker</span>
+      <span class="mode-pill" id="mode-pill"></span>
+    </div>
+    <div class="topbar-right">
+      <span class="who" id="who"></span>
+      <button class="btn btn-ghost" id="sign-out">Sign out</button>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- ---------- clients sidebar ---------- -->
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <h2>Clients</h2>
+        <button class="btn btn-sm btn-primary" id="add-client-btn">+ Add</button>
+      </div>
+      <nav class="client-list" id="client-list"></nav>
+    </aside>
+
+    <!-- ---------- tracker ---------- -->
+    <main class="main" id="main">
+
+      <!-- heading: channel name + email -->
+      <section class="client-head" id="client-head" hidden>
+        <div class="client-head-text">
+          <h1 id="client-name">—</h1>
+          <div class="client-meta">
+            <a id="client-youtube" class="chip chip-link" target="_blank" rel="noopener" hidden></a>
+            <span id="client-email" class="chip" hidden></span>
+          </div>
+        </div>
+        <div class="client-head-actions">
+          <button class="btn btn-ghost btn-sm" id="edit-client-btn">Edit</button>
+          <button class="btn btn-primary btn-sm" id="add-video-btn">+ Add video</button>
+        </div>
+      </section>
+
+      <!-- the four blocks, summarised -->
+      <section class="stats" id="stats" hidden></section>
+
+      <!-- tracker table -->
+      <section class="table-wrap" id="table-wrap" hidden>
+        <table class="tracker">
+          <thead>
+            <tr>
+              <th class="col-title">Video</th>
+              <th>Thumbnails</th>
+              <th>Intro</th>
+              <th>Copywriting</th>
+              <th>Status</th>
+              <th class="col-actions"></th>
+            </tr>
+          </thead>
+          <tbody id="video-rows"></tbody>
+        </table>
+      </section>
+
+      <div class="empty" id="empty-state"></div>
+    </main>
+  </div>
+</div>
+
+<!-- ========== modal ========== -->
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h2 id="modal-title"></h2>
+    <form id="modal-form"></form>
+    <p class="form-error" id="modal-error" hidden></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modal-cancel" type="button">Cancel</button>
+      <button class="btn btn-primary" id="modal-save" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script type="module" src="assets/js/app.js"></script>
+</body>
+</html>

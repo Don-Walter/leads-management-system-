@@ -1,0 +1,19 @@
+# ---- secrets ----
+# This repo is public. The anon key in assets/js/config.js is fine
+# (it's RLS-scoped and meant for the browser). Everything below is not.
+.env
+.env.*
+*.pem
+*secret*
+*service-role*
+*service_role*
+supabase/.temp/
+.supabase/
+
+# ---- local noise ----
+.DS_Store
+Thumbs.db
+node_modules/
+*.log
+.vscode/
+.idea/

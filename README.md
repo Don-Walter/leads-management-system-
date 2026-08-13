@@ -1,0 +1,71 @@
+# Podcast Client Tracker
+
+A per-client production tracker for podcast channels. Pick a client, see every
+episode, and track each one across four blocks:
+
+| Block | Values |
+|---|---|
+| **Thumbnails** | Not started · In progress · Done |
+| **Intro** | Not started · In progress · Done |
+| **Copywriting** | Not started · In progress · Done |
+| **Status** | To be uploaded · In process · Uploaded |
+
+The client's **podcast channel name**, **email** and **YouTube channel** sit in the
+page heading. Status changes save the moment you pick them.
+
+Static HTML/CSS/JS — no build step, no dependencies to install. Runs on GitHub
+Pages, backed by Supabase (Postgres + Auth + Row Level Security).
+
+## Run it
+
+```bash
+python3 -m http.server 4173
+```
+
+Then open <http://localhost:4173>. It must be served over HTTP — the app uses ES
+modules, which `file://` blocks.
+
+## Two modes
+
+The app picks its backend from `assets/js/config.js`:
+
+- **Local** — no Supabase anon key set. Data lives in this browser's
+  `localStorage`. Any email/password signs you in. Good for trying it out; not
+  shared between devices.
+- **Live** — anon key present. Real Supabase auth, shared Postgres data.
+
+The pill in the top bar tells you which one you're in.
+
+To go live, follow [docs/SETUP.md](docs/SETUP.md).
+
+## Layout
+
+```
+index.html              app shell + login gate
+assets/css/app.css      styling (light + dark)
+assets/js/config.js     Supabase URL + anon key
+assets/js/store.js      data layer — Supabase or localStorage
+assets/js/app.js        UI, rendering, event wiring
+supabase/schema.sql     tables, enums, triggers, RLS policies
+docs/SETUP.md           Supabase + GitHub Pages setup
+```
+
+## Security
+
+- The **anon key** is public by design and safe to commit. Every table is behind
+  Row Level Security, so the key alone reads nothing without a login.
+- The **database password** and **service_role key** must never be committed.
+  This repository is public. `.gitignore` blocks the usual secret filenames, but
+  that is a safety net, not a substitute for checking.
+- Only users with `role = 'admin'` in `public.profiles` can read or write.
+  Signups default to `teammate`, which currently has no access — so a stray
+  account can't reach client data.
+
+## Not built yet
+
+- **YouTube sync.** Episodes are added by hand. The schema already carries
+  `youtube_video_id`, `published_at` and `source`, so pulling the channel feed
+  in is additive. Needs a YouTube Data API key and a small serverless function
+  (the key can't live in the browser).
+- **Teammate access.** The `teammate` role and its policies exist; the access
+  grant is switched on in SQL when you're ready.
