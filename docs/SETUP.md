@@ -38,25 +38,37 @@ is rejected with Postgres error `42501`, and a bad password is rejected with
 
 ### 4. Create the admin login ⬅️ you need to do this
 
+**Do these two in order.** Public signups are open right now, and the bootstrap
+allowlist in `handle_new_user()` grants admin to `apexideamarketing7@gmail.com`
+on first login. Until signups are closed, a stranger could register that address
+first and take the admin row with it.
+
+**4a. Close public signups.**
+Dashboard → **Authentication** → **Sign In / Providers** → turn off
+**Allow new users to sign up**.
+
+**4b. Create the user.**
 Dashboard → **Authentication** → **Users** → **Add user**.
+Enter the email and password, and tick **Auto Confirm User** — otherwise
+Supabase waits on an email confirmation and sign-in fails.
 
-Enter the admin email and password, and tick **Auto Confirm User** — otherwise
-Supabase waits on an email confirmation and sign-in will fail.
-
-Then grant admin, in the SQL Editor:
-
-```sql
-update public.profiles set role = 'admin' where email = 'admin@example.com';
-```
-
-**This step is required.** New accounts default to `teammate`, which has no
-access yet — skip it and you'll sign in fine but see "Permission denied".
-
-Confirm it took:
+No SQL needed afterwards. The allowlist assigns `role = 'admin'` automatically
+on the first login. Verify with:
 
 ```sql
 select email, role from public.profiles;
 ```
+
+> Pick a password you have not shared anywhere. Anything sent over chat or
+> email should be considered public.
+
+To add another admin later, add the address to the `bootstrap_admins` array in
+[`supabase/schema.sql`](../supabase/schema.sql) and re-run the file — or, once
+you're signed in as admin, just promote them directly:
+>
+> ```sql
+> update public.profiles set role = 'admin' where email = 'someone@example.com';
+> ```
 
 ---
 
@@ -134,20 +146,18 @@ Then add each teammate under **Authentication → Users**. They land on
 
 ## Recommended hardening
 
-**Public signups are currently enabled.** Anyone who knows the project URL can
-create an account. They land on `teammate`, which has no policy granting access
-to `clients` or `videos`, so they see nothing — but it's needless exposure on an
-admin-only tool.
-
-Turn it off at Dashboard → **Authentication** → **Sign In / Providers** →
-disable **Allow new users to sign up**. You create logins from the Users tab
-instead, which is what you're doing anyway.
+**Close public signups** — see step 4a. This one is not optional while the
+bootstrap allowlist is active.
 
 **Rotate the `service_role` key.** It was shared in chat, and it bypasses RLS
 completely. Dashboard → **Project Settings** → **API Keys** → rotate. Nothing in
 this project uses it, so rotating breaks nothing.
 
 **Rotate the database password** for the same reason.
+
+**Rotate any GitHub token that was shared in chat.**
+<https://github.com/settings/tokens> → revoke → issue a fresh one. A `repo`-scoped
+token can push to every repository on the account.
 
 ---
 

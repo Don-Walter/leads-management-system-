@@ -47,19 +47,34 @@ comment on table public.profiles is
   'One row per login. role=admin grants full read/write; role=teammate is read + status updates only.';
 
 -- Auto-create a profile whenever someone signs up.
--- New users default to 'teammate' so a stray signup can never self-promote.
+--
+-- Everyone lands on 'teammate' so a stray signup can never self-promote.
+-- The one exception is the bootstrap allowlist below: those addresses are
+-- granted admin on first login, which is what saves you from having to run
+-- a promotion query by hand after creating the account.
+--
+-- Editing this array is the only way to mint an admin without already
+-- being one. Keep it short.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  bootstrap_admins text[] := array[
+    'apexideamarketing7@gmail.com'
+  ];
 begin
-  insert into public.profiles (id, email, full_name)
+  insert into public.profiles (id, email, full_name, role)
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1))
+    coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)),
+    case
+      when lower(new.email) = any (bootstrap_admins) then 'admin'::public.app_role
+      else 'teammate'::public.app_role
+    end
   )
   on conflict (id) do nothing;
   return new;
