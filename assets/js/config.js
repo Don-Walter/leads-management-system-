@@ -14,6 +14,5 @@ window.APP_CONFIG = {
   SUPABASE_URL: 'https://qppedffzzsavdumwpjdd.supabase.co',
 
   // Dashboard -> Project Settings -> API Keys -> "anon / public"
-  // Paste it here. Until then the app runs in local demo mode.
-  SUPABASE_ANON_KEY: '',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFwcGVkZmZ6enNhdmR1bXdwamRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NDIxMjQsImV4cCI6MjEwMjIxODEyNH0.nAs1w_fatIElkPwATyvy3M8a8cLLHydsJMh2DNlmlzo',
 };
