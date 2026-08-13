@@ -1,42 +1,42 @@
 # Setup
 
 Two parts: connect Supabase (the database), then publish to GitHub Pages.
-The app already works in local mode — this is what makes it real and shared.
+
+**Status:** steps 1–3 are done. The schema is applied to project
+`qppedffzzsavdumwpjdd` (region `ap-south-1`) and the anon key is in
+`config.js`. What's left is step 4 — creating the admin login.
 
 ---
 
 ## Part 1 — Supabase
 
-### 1. Create the tables
+### 1. Create the tables ✅ done
 
-Supabase Dashboard → **SQL Editor** → **New query**.
-Paste all of [`supabase/schema.sql`](../supabase/schema.sql) and hit **Run**.
+Applied via a direct pooler connection. To re-apply or change it later:
+Dashboard → **SQL Editor** → **New query** → paste
+[`supabase/schema.sql`](../supabase/schema.sql) → **Run**. Safe to re-run.
 
-That creates `profiles`, `clients` and `videos`, plus the enums, triggers and
-Row Level Security policies. It's safe to re-run.
+Verified in place: `profiles`, `clients`, `videos`, all three enums, and RLS
+enabled with policies on every table.
 
-### 2. Get the anon key
+### 2. Get the anon key ✅ done
 
-Dashboard → **Project Settings** → **API Keys** → copy the key labelled
+Dashboard → **Project Settings** → **API Keys** → the key labelled
 **`anon` / `public`**.
 
 > Take the **anon** key, not `service_role`. `service_role` bypasses Row Level
 > Security entirely — putting it in a public repo hands over the whole database.
 
-### 3. Put it in the app
+### 3. Put it in the app ✅ done
 
-Open [`assets/js/config.js`](../assets/js/config.js) and paste it in:
+It's in [`assets/js/config.js`](../assets/js/config.js). The login screen now
+reads "Connected to Supabase" and the top-bar pill reads **Live**.
 
-```js
-window.APP_CONFIG = {
-  SUPABASE_URL: 'https://qppedffzzsavdumwpjdd.supabase.co',
-  SUPABASE_ANON_KEY: 'eyJhbGciOi...',   // <- here
-};
-```
+Confirmed working: an anonymous `SELECT` returns empty, an anonymous `INSERT`
+is rejected with Postgres error `42501`, and a bad password is rejected with
+"Invalid login credentials".
 
-Reload. The top-bar pill should now read **Live** instead of **Local**.
-
-### 4. Create the admin login
+### 4. Create the admin login ⬅️ you need to do this
 
 Dashboard → **Authentication** → **Users** → **Add user**.
 
@@ -64,17 +64,22 @@ select email, role from public.profiles;
 
 ### 1. Push
 
+The repo is initialised, committed, and the remote is already set. What's
+missing is authentication — this machine has no stored GitHub credentials and
+no `gh` CLI.
+
+Create a **Personal Access Token** at <https://github.com/settings/tokens>
+with the **`repo`** scope, then push from Terminal:
+
 ```bash
-git remote add origin https://github.com/Don-Walter/leads-management-system-.git
-git push -u origin main
+git -C /Users/ss/leads push -u origin main
 ```
 
-The repo is already initialised and committed locally.
+When prompted: username `Don-Walter`, password = **the token**, not your
+account password (GitHub stopped accepting those in 2021).
 
-Pushing over HTTPS needs a **Personal Access Token** as the password — GitHub
-stopped accepting account passwords in 2021. Create one at
-<https://github.com/settings/tokens> with the **`repo`** scope, then use your
-username plus that token when prompted.
+The `osxkeychain` credential helper is configured for this repo, so macOS
+stores the token after that first push and you won't be asked again.
 
 ### 2. Turn on Pages
 
@@ -122,6 +127,27 @@ create policy videos_admin_write on public.videos
 
 Then add each teammate under **Authentication → Users**. They land on
 `teammate` automatically — no SQL needed per person.
+
+---
+
+---
+
+## Recommended hardening
+
+**Public signups are currently enabled.** Anyone who knows the project URL can
+create an account. They land on `teammate`, which has no policy granting access
+to `clients` or `videos`, so they see nothing — but it's needless exposure on an
+admin-only tool.
+
+Turn it off at Dashboard → **Authentication** → **Sign In / Providers** →
+disable **Allow new users to sign up**. You create logins from the Users tab
+instead, which is what you're doing anyway.
+
+**Rotate the `service_role` key.** It was shared in chat, and it bypasses RLS
+completely. Dashboard → **Project Settings** → **API Keys** → rotate. Nothing in
+this project uses it, so rotating breaks nothing.
+
+**Rotate the database password** for the same reason.
 
 ---
 
