@@ -3,8 +3,8 @@
 // ============================================================
 
 import {
-  MODE, auth, clients, videos,
-  WORK_STATUS, UPLOAD_STATUS, WORK_FIELDS,
+  MODE, auth, clients, videos, attachments, isStaff,
+  WORK_STATUS, UPLOAD_STATUS, APPROVAL_STATUS, WORK_FIELDS, BLOCKS, LEAF_BLOCKS,
 } from './store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -12,9 +12,12 @@ const $ = (id) => document.getElementById(id);
 const state = {
   user: null,
   role: null,
+  staff: false,
   clients: [],
   activeId: null,
   videos: [],
+  attachments: [],
+  expanded: new Set(),
 };
 
 // ------------------------------------------------------------
@@ -23,13 +26,24 @@ const state = {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// Every status maps to one of three colours, so a row can be read
-// at a glance without anyone parsing the words.
 const TONE = {
-  not_started: 's-grey',  in_progress: 's-amber', done: 's-green',
+  not_started: 's-grey', in_progress: 's-amber', done: 's-green',
   to_be_uploaded: 's-grey', in_process: 's-amber', uploaded: 's-green',
+  pending: 's-grey', cleared: 's-green', needs_change: 's-red',
 };
-const TONE_HEX = { 's-grey': 'var(--grey)', 's-amber': 'var(--amber)', 's-green': 'var(--green)' };
+const TONE_HEX = {
+  's-grey': 'var(--grey)', 's-amber': 'var(--amber)',
+  's-green': 'var(--green)', 's-red': 'var(--red)',
+};
+
+const labelOf = (opts, v) => opts.find((o) => o.value === v)?.label ?? v;
+
+function fileSize(n) {
+  if (!n && n !== 0) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(0) + ' KB';
+  return (n / 1048576).toFixed(1) + ' MB';
+}
 
 let toastTimer;
 function toast(msg, isError = false) {
@@ -38,17 +52,17 @@ function toast(msg, isError = false) {
   el.classList.toggle('err', isError);
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 3200);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 3600);
 }
 
-// Supabase surfaces RLS denials as a permissions error; translate
-// that into something that says what to actually do about it.
 function explain(err) {
   const msg = err?.message || String(err);
-  if (/row-level security|permission denied|violates/i.test(msg)) {
-    return 'Permission denied. This login is not marked as an admin yet — ' +
-           'see step 4 in docs/SETUP.md.';
+  if (/row-level security|permission denied|violates row/i.test(msg)) {
+    return state.staff
+      ? 'Permission denied. This login is not marked as an admin yet — see docs/SETUP.md.'
+      : 'Your account has read-only access to this channel.';
   }
+  if (/Payload too large|exceeded the maximum/i.test(msg)) return 'That file is over the 50 MB limit.';
   return msg;
 }
 
@@ -59,40 +73,26 @@ function showLogin() {
   $('login-view').hidden = false;
   $('app-view').hidden = true;
   $('login-mode').textContent = MODE === 'local'
-    ? 'Local mode — no Supabase key set yet, so data is saved in this browser only. ' +
-      'Any email and password will get you in.'
+    ? 'Local mode — no Supabase key set, so data is saved in this browser only. Any email and password will get you in.'
     : 'Connected to Supabase.';
 }
 
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const btn = $('login-submit');
-  const err = $('login-error');
-  err.hidden = true;
-  btn.disabled = true;
-  btn.textContent = 'Signing in…';
+  const btn = $('login-submit'), err = $('login-error');
+  err.hidden = true; btn.disabled = true; btn.textContent = 'Signing in…';
 
-  const { user, error } = await auth.signIn(
-    $('login-email').value.trim(),
-    $('login-password').value,
-  );
+  const { user, error } = await auth.signIn($('login-email').value.trim(), $('login-password').value);
 
-  btn.disabled = false;
-  btn.textContent = 'Sign in';
-
-  if (error) {
-    err.textContent = error.message;
-    err.hidden = false;
-    return;
-  }
+  btn.disabled = false; btn.textContent = 'Sign in';
+  if (error) { err.textContent = error.message; err.hidden = false; return; }
   state.user = user;
   await enterApp();
 });
 
 $('sign-out').addEventListener('click', async () => {
   await auth.signOut();
-  state.user = null;
-  state.activeId = null;
+  Object.assign(state, { user: null, role: null, staff: false, activeId: null, expanded: new Set() });
   showLogin();
 });
 
@@ -101,6 +101,7 @@ $('sign-out').addEventListener('click', async () => {
 // ------------------------------------------------------------
 async function enterApp() {
   state.role = await auth.currentRole();
+  state.staff = isStaff(state.role);
 
   $('login-view').hidden = true;
   $('app-view').hidden = false;
@@ -110,48 +111,52 @@ async function enterApp() {
   pill.textContent = MODE === 'local' ? 'Local' : 'Live';
   pill.className = 'mode-pill ' + (MODE === 'local' ? 'local' : 'live');
 
+  const rolePill = $('role-pill');
+  rolePill.textContent = { admin: 'Admin', teammate: 'Team', client: 'Client' }[state.role] || 'No access';
+  rolePill.className = 'role-pill ' + (state.role || 'none');
+
+  // clients cannot create anything — hide rather than fail on click
+  $('add-client-btn').hidden = !state.staff;
+  $('add-video-btn').hidden = !state.staff;
+  $('edit-client-btn').hidden = !state.staff;
+
   await loadClients();
 }
 
 async function loadClients() {
   try {
     state.clients = await clients.list();
-  } catch (e) {
-    toast(explain(e), true);
-    state.clients = [];
-  }
-  renderClientList();
+  } catch (e) { toast(explain(e), true); state.clients = []; }
 
+  renderClientList();
   if (state.clients.length && !state.clients.some((c) => c.id === state.activeId)) {
     state.activeId = state.clients[0].id;
   }
   if (!state.clients.length) state.activeId = null;
-
   await loadVideos();
 }
 
 async function loadVideos() {
-  if (!state.activeId) {
-    state.videos = [];
-    renderMain();
-    return;
-  }
+  if (!state.activeId) { state.videos = []; state.attachments = []; return renderMain(); }
   try {
     state.videos = await videos.listByClient(state.activeId);
+    state.attachments = await attachments.listByVideos(state.videos.map((v) => v.id));
   } catch (e) {
     toast(explain(e), true);
-    state.videos = [];
+    state.videos = []; state.attachments = [];
   }
   renderMain();
 }
 
 // ------------------------------------------------------------
-//  render: sidebar
+//  sidebar
 // ------------------------------------------------------------
 function renderClientList() {
   const box = $('client-list');
   if (!state.clients.length) {
-    box.innerHTML = '<p class="sidebar-empty">No clients yet.</p>';
+    box.innerHTML = `<p class="sidebar-empty">${state.staff
+      ? 'No clients yet.'
+      : 'No channel has been shared with your account yet.'}</p>`;
     return;
   }
   box.innerHTML = state.clients.map((c) => `
@@ -163,6 +168,7 @@ function renderClientList() {
   box.querySelectorAll('.client-item').forEach((el) => {
     el.addEventListener('click', async () => {
       state.activeId = el.dataset.id;
+      state.expanded.clear();
       renderClientList();
       await loadVideos();
     });
@@ -170,7 +176,7 @@ function renderClientList() {
 }
 
 // ------------------------------------------------------------
-//  render: main
+//  main
 // ------------------------------------------------------------
 function renderMain() {
   const client = state.clients.find((c) => c.id === state.activeId);
@@ -181,12 +187,12 @@ function renderMain() {
   $('table-wrap').hidden = !has || !state.videos.length;
 
   if (!has) {
-    $('empty-state').innerHTML =
-      '<strong>No client selected</strong>Add a podcast client to start tracking episodes.';
+    $('empty-state').innerHTML = state.staff
+      ? '<strong>No client selected</strong>Add a podcast client to start tracking episodes.'
+      : '<strong>Nothing shared yet</strong>Ask your producer to give your account access to a channel.';
     return;
   }
 
-  // ---- heading: channel name + email ----
   $('client-name').textContent = client.channel_name;
 
   const yt = $('client-youtube');
@@ -194,54 +200,45 @@ function renderMain() {
     yt.hidden = false;
     yt.href = normaliseYouTube(client.youtube_url);
     yt.textContent = '▶ ' + client.youtube_url.replace(/^https?:\/\/(www\.)?/, '');
-  } else {
-    yt.hidden = true;
-  }
+  } else yt.hidden = true;
 
   const em = $('client-email');
   em.hidden = !client.email;
   em.textContent = client.email || '';
 
-  // ---- the four blocks ----
   if (state.videos.length) {
-    renderStats();
-    renderRows();
-    $('empty-state').innerHTML = '';
+    renderStats(); renderRows(); $('empty-state').innerHTML = '';
   } else {
-    $('empty-state').innerHTML =
-      '<strong>No videos yet</strong>Add an episode to start tracking thumbnails, intro, copywriting and status.';
+    $('empty-state').innerHTML = state.staff
+      ? '<strong>No videos yet</strong>Add an episode to start tracking thumbnails, intro, copywriting and status.'
+      : '<strong>No videos yet</strong>Nothing has been added to this channel.';
   }
 }
 
 function normaliseYouTube(v) {
   const s = v.trim();
   if (/^https?:\/\//i.test(s)) return s;
-  if (s.startsWith('@')) return 'https://youtube.com/' + s;
-  return 'https://' + s;
+  return 'https://' + (s.startsWith('@') ? 'youtube.com/' + s : s);
 }
 
-// One card per block, showing how the episodes are distributed.
 function renderStats() {
   const blocks = [
     ...WORK_FIELDS.map((f) => ({ ...f, options: WORK_STATUS })),
     { key: 'status', label: 'Status', options: UPLOAD_STATUS },
+    { key: 'approval_status', label: 'Client approval', options: APPROVAL_STATUS },
   ];
 
   $('stats').innerHTML = blocks.map((b) => {
     const counts = b.options.map((o) => ({
       ...o,
-      n: state.videos.filter((v) => v[b.key] === o.value).length,
+      n: state.videos.filter((v) => (v[b.key] ?? 'pending') === o.value).length,
       tone: TONE[o.value],
     }));
     const total = state.videos.length || 1;
-
     const bar = counts.map((c) => c.n
-      ? `<span style="width:${(c.n / total) * 100}%;background:${TONE_HEX[c.tone]}"></span>`
-      : '').join('');
-
+      ? `<span style="width:${(c.n / total) * 100}%;background:${TONE_HEX[c.tone]}"></span>` : '').join('');
     const legend = counts.map((c) =>
       `<span><i style="background:${TONE_HEX[c.tone]}"></i>${esc(c.label)} ${c.n}</span>`).join('');
-
     return `<div class="stat">
       <div class="stat-label">${esc(b.label)}</div>
       <div class="stat-bar">${bar}</div>
@@ -250,66 +247,194 @@ function renderStats() {
   }).join('');
 }
 
-function selectHTML(id, field, value, options) {
+// A dropdown for staff, a static pill for clients. Same colours either
+// way, so the board reads identically no matter who is looking at it.
+function statusControl(id, field, value, options, editable) {
+  const tone = TONE[value] || 's-grey';
+  if (!editable) {
+    return `<span class="status-pill ${tone}">${esc(labelOf(options, value))}</span>`;
+  }
   const opts = options.map((o) =>
     `<option value="${o.value}" ${o.value === value ? 'selected' : ''}>${esc(o.label)}</option>`).join('');
-  return `<select class="status-select ${TONE[value] || 's-grey'}"
-                  data-id="${esc(id)}" data-field="${field}">${opts}</select>`;
+  return `<select class="status-select ${tone}" data-id="${esc(id)}" data-field="${field}">${opts}</select>`;
+}
+
+function attachCount(videoId, block) {
+  return state.attachments.filter((a) => a.video_id === videoId && a.block === block).length;
 }
 
 function renderRows() {
+  const canEdit = state.staff;
+
   $('video-rows').innerHTML = state.videos.map((v) => {
     const bits = [];
     if (v.episode_no != null && v.episode_no !== '') bits.push('Ep ' + esc(v.episode_no));
     if (v.due_date) bits.push('Due ' + esc(v.due_date));
-    if (v.youtube_video_id) {
-      bits.push(`<a href="https://youtu.be/${esc(v.youtube_video_id)}" target="_blank" rel="noopener">Watch</a>`);
-    }
+    if (v.youtube_video_id) bits.push(`<a href="https://youtu.be/${esc(v.youtube_video_id)}" target="_blank" rel="noopener">Watch</a>`);
 
-    return `<tr>
+    const files = LEAF_BLOCKS.reduce((n, b) => n + attachCount(v.id, b.key), 0);
+    if (files) bits.push(`${files} file${files === 1 ? '' : 's'}`);
+
+    const open = state.expanded.has(v.id);
+    const approval = v.approval_status || 'pending';
+
+    return `<tr class="v-row ${open ? 'open' : ''}">
+      <td class="col-exp">
+        <button class="expander ${open ? 'open' : ''}" data-exp="${esc(v.id)}"
+                aria-label="${open ? 'Collapse' : 'Expand'} ${esc(v.title)}">▸</button>
+      </td>
       <td>
         <div class="v-title">${esc(v.title)}</div>
         ${bits.length ? `<div class="v-sub">${bits.join(' · ')}</div>` : ''}
       </td>
-      <td>${selectHTML(v.id, 'thumbnail_status', v.thumbnail_status, WORK_STATUS)}</td>
-      <td>${selectHTML(v.id, 'intro_status',     v.intro_status,     WORK_STATUS)}</td>
-      <td>${selectHTML(v.id, 'copy_status',      v.copy_status,      WORK_STATUS)}</td>
-      <td>${selectHTML(v.id, 'status',           v.status,           UPLOAD_STATUS)}</td>
-      <td><button class="btn-icon" data-del="${esc(v.id)}" title="Delete video">✕</button></td>
-    </tr>`;
+      <td>${statusControl(v.id, 'thumbnail_status', v.thumbnail_status, WORK_STATUS, canEdit)}</td>
+      <td>${statusControl(v.id, 'intro_status', v.intro_status, WORK_STATUS, canEdit)}</td>
+      <td>${statusControl(v.id, 'copy_status', v.copy_status, WORK_STATUS, false)}
+          <div class="rollup-hint">from 3 subgroups</div></td>
+      <td>${statusControl(v.id, 'status', v.status, UPLOAD_STATUS, canEdit)}</td>
+      <td>
+        <button class="status-pill btn-pill ${TONE[approval]}" data-approve="${esc(v.id)}">
+          ${esc(labelOf(APPROVAL_STATUS, approval))}
+        </button>
+        ${approval === 'needs_change' && v.approval_note
+          ? `<div class="v-sub note">“${esc(v.approval_note)}”</div>` : ''}
+      </td>
+      <td>${canEdit ? `<button class="btn-icon" data-del="${esc(v.id)}" title="Delete video">✕</button>` : ''}</td>
+    </tr>
+    ${open ? detailRow(v, canEdit) : ''}`;
   }).join('');
 
-  // Status changes save immediately — this is a tracker, not a form.
-  $('video-rows').querySelectorAll('.status-select').forEach((sel) => {
+  wireRows();
+}
+
+// ------------------------------------------------------------
+//  expanded detail: every block, with its attachments
+// ------------------------------------------------------------
+function detailRow(v, canEdit) {
+  const section = (leaf, nested) => `
+    <div class="blk ${nested ? 'nested' : ''}">
+      <div class="blk-head">
+        <span class="blk-name">${esc(leaf.label)}</span>
+        ${statusControl(v.id, leaf.field, v[leaf.field], WORK_STATUS, canEdit)}
+        ${canEdit ? `<button class="btn btn-sm btn-ghost" data-add-att="${esc(v.id)}"
+                      data-block="${leaf.key}">+ Add</button>` : ''}
+      </div>
+      ${attachmentList(v.id, leaf.key, canEdit)}
+    </div>`;
+
+  const body = BLOCKS.map((b) => b.children
+    ? `<div class="blk group">
+         <div class="blk-head">
+           <span class="blk-name">${esc(b.label)}</span>
+           ${statusControl(v.id, b.rollup, v[b.rollup], WORK_STATUS, false)}
+         </div>
+         ${b.children.map((c) => section(c, true)).join('')}
+       </div>`
+    : section(b, false)).join('');
+
+  return `<tr class="detail-row"><td colspan="8">
+    <div class="detail">
+      ${body}
+      ${v.notes ? `<div class="blk"><div class="blk-head"><span class="blk-name">Notes</span></div>
+        <p class="att-note">${esc(v.notes)}</p></div>` : ''}
+    </div>
+  </td></tr>`;
+}
+
+function attachmentList(videoId, block, canEdit) {
+  const rows = state.attachments.filter((a) => a.video_id === videoId && a.block === block);
+  if (!rows.length) return '<p class="att-empty">Nothing attached yet.</p>';
+
+  return `<ul class="att-list">${rows.map((a) => {
+    const name = a.label || a.file_name || a.url || 'Note';
+    let main;
+    if (a.kind === 'file') {
+      main = `<button class="att-link" data-dl="${esc(a.id)}">${esc(name)}</button>
+              <span class="att-meta">${esc(fileSize(a.size_bytes))}</span>`;
+    } else if (a.kind === 'link') {
+      main = `<a class="att-link" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(name)}</a>`;
+    } else {
+      main = `<span class="att-link static">${esc(name)}</span>
+              <p class="att-note">${esc(a.body)}</p>`;
+    }
+    const icon = { file: '📎', link: '🔗', note: '📝' }[a.kind];
+    return `<li class="att">
+      <span class="att-kind" title="${a.kind}">${icon}</span>
+      <div class="att-body">${main}</div>
+      ${canEdit ? `<button class="btn-icon" data-att-del="${esc(a.id)}" title="Remove">✕</button>` : ''}
+    </li>`;
+  }).join('')}</ul>`;
+}
+
+// ------------------------------------------------------------
+//  row wiring
+// ------------------------------------------------------------
+function wireRows() {
+  const rows = $('video-rows');
+
+  rows.querySelectorAll('[data-exp]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.exp;
+      state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
+      renderRows();
+    });
+  });
+
+  rows.querySelectorAll('.status-select').forEach((sel) => {
     sel.addEventListener('change', async () => {
       const { id, field } = sel.dataset;
-      const previous = state.videos.find((v) => v.id === id)?.[field];
-
+      const row = state.videos.find((v) => v.id === id);
+      const previous = row?.[field];
       sel.className = 'status-select ' + (TONE[sel.value] || 's-grey');
       try {
-        await videos.update(id, { [field]: sel.value });
-        const row = state.videos.find((v) => v.id === id);
-        if (row) row[field] = sel.value;
+        const updated = await videos.update(id, { [field]: sel.value });
+        if (row) Object.assign(row, updated || { [field]: sel.value });
         renderStats();
+        // the Copywriting cell is derived, so redraw when a subgroup moves
+        if (field.startsWith('copy_')) renderRows();
       } catch (e) {
-        sel.value = previous;                                  // put it back
+        sel.value = previous;
         sel.className = 'status-select ' + (TONE[previous] || 's-grey');
         toast(explain(e), true);
       }
     });
   });
 
-  $('video-rows').querySelectorAll('[data-del]').forEach((btn) => {
+  rows.querySelectorAll('[data-approve]').forEach((btn) =>
+    btn.addEventListener('click', () => openApproval(btn.dataset.approve)));
+
+  rows.querySelectorAll('[data-add-att]').forEach((btn) =>
+    btn.addEventListener('click', () => openAttach(btn.dataset.addAtt, btn.dataset.block)));
+
+  rows.querySelectorAll('[data-dl]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const a = state.attachments.find((x) => x.id === btn.dataset.dl);
+      try {
+        const url = await attachments.signedUrl(a.storage_path);
+        window.open(url, '_blank', 'noopener');
+      } catch (e) { toast(explain(e), true); }
+    });
+  });
+
+  rows.querySelectorAll('[data-att-del]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const a = state.attachments.find((x) => x.id === btn.dataset.attDel);
+      if (!confirm(`Remove "${a.label || a.file_name || a.url || 'this note'}"?`)) return;
+      try {
+        await attachments.remove(a);
+        state.attachments = state.attachments.filter((x) => x.id !== a.id);
+        renderRows();
+        toast('Removed.');
+      } catch (e) { toast(explain(e), true); }
+    });
+  });
+
+  rows.querySelectorAll('[data-del]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const v = state.videos.find((x) => x.id === btn.dataset.del);
-      if (!confirm(`Delete "${v?.title}"? This cannot be undone.`)) return;
-      try {
-        await videos.remove(btn.dataset.del);
-        await loadVideos();
-        toast('Video deleted.');
-      } catch (e) {
-        toast(explain(e), true);
-      }
+      if (!confirm(`Delete "${v?.title}" and everything attached to it? This cannot be undone.`)) return;
+      try { await videos.remove(btn.dataset.del); await loadVideos(); toast('Video deleted.'); }
+      catch (e) { toast(explain(e), true); }
     });
   });
 }
@@ -319,65 +444,152 @@ function renderRows() {
 // ------------------------------------------------------------
 let onSave = null;
 
-function openModal(title, fieldsHTML, handler) {
+function openModal(title, html, handler) {
   $('modal-title').textContent = title;
-  $('modal-form').innerHTML = fieldsHTML;
+  $('modal-form').innerHTML = html;
   $('modal-error').hidden = true;
   $('modal').hidden = false;
   onSave = handler;
   $('modal-form').querySelector('input, textarea, select')?.focus();
 }
 
-function closeModal() {
-  $('modal').hidden = true;
-  onSave = null;
-}
+function closeModal() { $('modal').hidden = true; onSave = null; }
 
 $('modal-cancel').addEventListener('click', closeModal);
 $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('modal').hidden) closeModal(); });
 
-// Enter submits, except in the notes textarea.
 $('modal-form').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-    e.preventDefault();
-    $('modal-save').click();
-  }
+  if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); $('modal-save').click(); }
 });
 
 $('modal-save').addEventListener('click', async () => {
   if (!onSave) return;
   const data = Object.fromEntries(new FormData($('modal-form')).entries());
   const btn = $('modal-save');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  try {
-    await onSave(data);
-    closeModal();
-  } catch (e) {
-    $('modal-error').textContent = explain(e);
-    $('modal-error').hidden = false;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Save';
-  }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try { await onSave(data); closeModal(); }
+  catch (e) { $('modal-error').textContent = explain(e); $('modal-error').hidden = false; }
+  finally { btn.disabled = false; btn.textContent = 'Save'; }
 });
 
 // ------------------------------------------------------------
-//  add / edit client
+//  attachments modal — file, link, or pasted text
+// ------------------------------------------------------------
+function openAttach(videoId, block) {
+  const leaf = LEAF_BLOCKS.find((b) => b.key === block);
+  const canUpload = attachments.supportsUpload;
+
+  openModal(`Add to ${leaf.label}`, `
+    <div class="seg" role="tablist">
+      ${['file', 'link', 'note'].map((k, i) => `
+        <button type="button" class="seg-btn ${i === 0 ? 'on' : ''}" data-kind="${k}">
+          ${{ file: '📎 File', link: '🔗 Link', note: '📝 Text' }[k]}
+        </button>`).join('')}
+    </div>
+
+    <div data-pane="file">
+      ${canUpload ? `
+        <label for="f-file">Choose a file</label>
+        <input id="f-file" type="file" />
+        <p class="hint">Images, PDFs, docs, audio or video. 50 MB max.</p>`
+      : `<p class="hint">File upload needs Supabase. Use Link or Text in local mode.</p>`}
+    </div>
+
+    <div data-pane="link" hidden>
+      <label for="f-url">URL</label>
+      <input id="f-url" name="url" type="text" placeholder="https://drive.google.com/…" />
+    </div>
+
+    <div data-pane="note" hidden>
+      <label for="f-body">Text</label>
+      <textarea id="f-body" name="body" rows="6" placeholder="Paste the description, SEO tags, transcript…"></textarea>
+    </div>
+
+    <label for="f-label">Label <span class="opt">(optional)</span></label>
+    <input id="f-label" name="label" type="text" placeholder="e.g. Thumbnail v3" />
+  `, async (data) => {
+    const kind = $('modal-form').querySelector('.seg-btn.on').dataset.kind;
+    const clientId = state.activeId;
+
+    let created;
+    if (kind === 'file') {
+      const f = $('f-file')?.files?.[0];
+      if (!f) throw new Error('Choose a file first.');
+      created = await attachments.addFile(videoId, clientId, block, f);
+    } else if (kind === 'link') {
+      if (!data.url?.trim()) throw new Error('Paste a URL first.');
+      created = await attachments.addLink(videoId, block, data.url, data.label);
+    } else {
+      if (!data.body?.trim()) throw new Error('Type or paste something first.');
+      created = await attachments.addNote(videoId, block, data.body, data.label);
+    }
+
+    state.attachments.push(created);
+    state.expanded.add(videoId);
+    renderRows();
+    toast('Attached.');
+  });
+
+  // segmented control swaps which pane is live
+  const form = $('modal-form');
+  form.querySelectorAll('.seg-btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      form.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+      form.querySelectorAll('[data-pane]').forEach((p) => { p.hidden = p.dataset.pane !== b.dataset.kind; });
+      form.querySelector(`[data-pane="${b.dataset.kind}"] input, [data-pane="${b.dataset.kind}"] textarea`)?.focus();
+    });
+  });
+}
+
+// ------------------------------------------------------------
+//  approval modal — the one thing a client can change
+// ------------------------------------------------------------
+function openApproval(videoId) {
+  const v = state.videos.find((x) => x.id === videoId);
+  const current = v.approval_status || 'pending';
+
+  openModal('Client approval', `
+    <label for="f-appr">Status</label>
+    <select id="f-appr" name="status">
+      ${APPROVAL_STATUS.map((o) =>
+        `<option value="${o.value}" ${o.value === current ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}
+    </select>
+
+    <div id="note-wrap" ${current === 'needs_change' ? '' : 'hidden'}>
+      <label for="f-note">What needs changing?</label>
+      <textarea id="f-note" name="note" rows="4"
+        placeholder="Be specific — the logo is too small, wrong episode number…">${esc(v.approval_note || '')}</textarea>
+    </div>
+  `, async (data) => {
+    if (data.status === 'needs_change' && !data.note?.trim()) {
+      throw new Error('Say what needs changing.');
+    }
+    await videos.setApproval(videoId, data.status, data.note);
+    v.approval_status = data.status;
+    v.approval_note = data.status === 'needs_change' ? data.note.trim() : null;
+    renderRows(); renderStats();
+    toast('Approval updated.');
+  });
+
+  // the note is required for "needs change", so only show it then
+  $('f-appr').addEventListener('change', (e) => {
+    $('note-wrap').hidden = e.target.value !== 'needs_change';
+    if (!$('note-wrap').hidden) $('f-note').focus();
+  });
+}
+
+// ------------------------------------------------------------
+//  clients + videos
 // ------------------------------------------------------------
 function clientFields(c = {}) {
   return `
     <label for="f-name">Podcast / channel name</label>
     <input id="f-name" name="channel_name" type="text" required value="${esc(c.channel_name || '')}" />
-
     <label for="f-email">Client email</label>
     <input id="f-email" name="email" type="email" value="${esc(c.email || '')}" />
-
     <label for="f-yt">YouTube channel</label>
-    <input id="f-yt" name="youtube_url" type="text" placeholder="@handle or full URL"
-           value="${esc(c.youtube_url || '')}" />
-
+    <input id="f-yt" name="youtube_url" type="text" placeholder="@handle or full URL" value="${esc(c.youtube_url || '')}" />
     <label for="f-notes">Notes</label>
     <textarea id="f-notes" name="notes">${esc(c.notes || '')}</textarea>`;
 }
@@ -403,46 +615,28 @@ $('edit-client-btn').addEventListener('click', () => {
   });
 });
 
-// ------------------------------------------------------------
-//  add video
-// ------------------------------------------------------------
 $('add-video-btn').addEventListener('click', () => {
-  const statusOpts = UPLOAD_STATUS.map((o) =>
-    `<option value="${o.value}">${esc(o.label)}</option>`).join('');
-
   openModal('Add video', `
     <label for="f-title">Video title</label>
     <input id="f-title" name="title" type="text" required />
-
     <div class="field-row">
-      <div>
-        <label for="f-ep">Episode no.</label>
-        <input id="f-ep" name="episode_no" type="number" min="0" />
-      </div>
-      <div>
-        <label for="f-due">Due date</label>
-        <input id="f-due" name="due_date" type="date" />
-      </div>
+      <div><label for="f-ep">Episode no.</label><input id="f-ep" name="episode_no" type="number" min="0" /></div>
+      <div><label for="f-due">Due date</label><input id="f-due" name="due_date" type="date" /></div>
     </div>
-
     <label for="f-status">Status</label>
-    <select id="f-status" name="status">${statusOpts}</select>
-
-    <label for="f-vid">YouTube video ID <span style="text-transform:none">(if already live)</span></label>
+    <select id="f-status" name="status">
+      ${UPLOAD_STATUS.map((o) => `<option value="${o.value}">${esc(o.label)}</option>`).join('')}
+    </select>
+    <label for="f-vid">YouTube video ID <span class="opt">(if already live)</span></label>
     <input id="f-vid" name="youtube_video_id" type="text" placeholder="dQw4w9WgXcQ" />
-
     <label for="f-vnotes">Notes</label>
     <textarea id="f-vnotes" name="notes"></textarea>
   `, async (data) => {
     if (!data.title.trim()) throw new Error('Video title is required.');
-
-    // Empty form fields arrive as '' — Postgres wants null for
-    // the integer, date and text columns.
     for (const k of ['episode_no', 'due_date', 'youtube_video_id', 'notes']) {
       if (data[k] === '') data[k] = null;
     }
     data.client_id = state.activeId;
-
     await videos.create(data);
     await loadVideos();
     toast('Video added.');
@@ -454,10 +648,6 @@ $('add-video-btn').addEventListener('click', () => {
 // ------------------------------------------------------------
 (async function init() {
   const user = await auth.currentUser();
-  if (user) {
-    state.user = user;
-    await enterApp();
-  } else {
-    showLogin();
-  }
+  if (user) { state.user = user; await enterApp(); }
+  else showLogin();
 })();

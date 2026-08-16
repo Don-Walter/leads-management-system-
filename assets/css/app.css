@@ -590,3 +590,164 @@ label {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ============================================================
+   v2 — role badge, expandable detail, attachments, approval
+   ============================================================ */
+
+.role-pill {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 1px solid var(--border-lit);
+  color: var(--text-mute);
+}
+.role-pill.admin    { color: var(--accent); border-color: rgba(242,194,48,.45); background: var(--accent-lo); }
+.role-pill.teammate { color: var(--green);  border-color: rgba(76,195,138,.4);  background: rgba(76,195,138,.1); }
+.role-pill.client   { color: #7fb3f5;       border-color: rgba(127,179,245,.4); background: rgba(127,179,245,.1); }
+.role-pill.none     { color: var(--red);    border-color: rgba(229,100,91,.45); }
+
+/* ---------------- read-only status ---------------- */
+/* matches .status-select exactly so the board looks the same to a
+   client as it does to staff — only the interactivity differs */
+.status-pill {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 20px;
+  border: 1px solid currentColor;
+  text-align: center;
+  min-width: 132px;
+}
+.s-red { color: var(--red); background: rgba(229,100,91,.1); }
+
+button.btn-pill { cursor: pointer; background: transparent; font: inherit; }
+button.btn-pill:hover { background: rgba(255,255,255,.05); }
+
+.rollup-hint { font-size: 10.5px; color: var(--text-mute); margin-top: 4px; letter-spacing: .02em; }
+.v-sub.note { font-style: italic; max-width: 210px; }
+
+/* ---------------- expander ---------------- */
+.col-exp { width: 34px; }
+.expander {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-mute); font-size: 13px; line-height: 1;
+  padding: 5px 6px; border-radius: 6px;
+  transition: transform .16s, color .16s, background .16s;
+}
+.expander:hover { color: var(--accent); background: var(--surface-3); }
+.expander.open { transform: rotate(90deg); color: var(--accent); }
+
+.v-row.open > td { background: var(--surface-2); border-bottom-color: transparent; }
+
+/* ---------------- detail panel ---------------- */
+.detail-row > td { padding: 0 !important; background: var(--surface-2); }
+.detail {
+  padding: 6px 16px 20px 50px;
+  display: grid;
+  gap: 10px;
+  border-left: 2px solid var(--accent);
+  margin-left: 16px;
+}
+
+.blk {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px 14px;
+}
+.blk.group { background: transparent; border-style: dashed; padding: 12px; }
+.blk.nested { margin-top: 10px; }
+
+.blk-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.blk-name {
+  font-size: 11px; font-weight: 750; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-dim);
+  min-width: 96px;
+}
+.blk.group > .blk-head > .blk-name { color: var(--accent); }
+
+/* ---------------- attachments ---------------- */
+.att-empty { color: var(--text-mute); font-size: 12.5px; margin: 9px 0 0; }
+
+.att-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.att {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+}
+.att-kind { font-size: 13px; line-height: 1.4; flex: 0 0 auto; }
+.att-body { min-width: 0; flex: 1; }
+
+.att-link {
+  font: inherit; font-size: 13.5px; font-weight: 550;
+  color: var(--accent); background: none; border: none; padding: 0;
+  cursor: pointer; text-align: left; text-decoration: none;
+  word-break: break-word;
+}
+.att-link:hover { text-decoration: underline; }
+.att-link.static { color: var(--text); cursor: default; }
+.att-link.static:hover { text-decoration: none; }
+
+.att-meta { font-size: 11.5px; color: var(--text-mute); margin-left: 8px; }
+.att-note {
+  font-size: 13px; color: var(--text-dim);
+  margin: 5px 0 0; white-space: pre-wrap; word-break: break-word;
+  max-height: 190px; overflow-y: auto;
+}
+
+/* ---------------- segmented control ---------------- */
+.seg { display: flex; gap: 5px; margin-bottom: 4px; }
+.seg-btn {
+  flex: 1; font: inherit; font-size: 13px; font-weight: 550;
+  padding: 8px 6px; cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  transition: background .14s, color .14s, border-color .14s;
+}
+.seg-btn:hover { background: var(--surface-3); color: var(--text); }
+.seg-btn.on {
+  background: var(--accent-lo);
+  border-color: rgba(242,194,48,.5);
+  color: var(--accent);
+}
+
+.hint { font-size: 12.5px; color: var(--text-mute); margin: 7px 0 0; }
+.opt { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--text-mute); }
+
+input[type=file] {
+  font-size: 13px; padding: 9px;
+  background: var(--bg); border: 1px dashed var(--border-lit);
+  border-radius: 8px; width: 100%; cursor: pointer; color: var(--text-dim);
+}
+input[type=file]::file-selector-button {
+  font: inherit; font-size: 12.5px; font-weight: 600;
+  margin-right: 10px; padding: 5px 11px; cursor: pointer;
+  background: var(--accent); color: #17130a;
+  border: none; border-radius: 6px;
+}
+
+@media (max-width: 760px) {
+  .detail { padding-left: 16px; margin-left: 6px; }
+  .blk-name { min-width: 0; }
+}
+
+/* The global `select { width: 100% }` rule makes status controls
+   stretch when they sit in the flex block header. Inside a block
+   they should stay pill-sized, with Add pushed to the far right. */
+.blk-head .status-select,
+.blk-head .status-pill {
+  width: auto;
+  flex: 0 0 auto;
+  min-width: 118px;
+}
+.blk-head .btn { margin-left: auto; }
+.blk-head .status-pill { cursor: default; }

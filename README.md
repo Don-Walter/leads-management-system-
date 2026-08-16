@@ -7,8 +7,15 @@ episode, and track each one across four blocks:
 |---|---|
 | **Thumbnails** | Not started · In progress · Done |
 | **Intro** | Not started · In progress · Done |
-| **Copywriting** | Not started · In progress · Done |
+| **Copywriting** | Description · SEO · Transcript (each with its own status) |
 | **Status** | To be uploaded · In process · Uploaded |
+| **Client approval** | Pending review · Cleared · Needs change |
+
+Expand any row to reach the detail panel, where every block takes attachments —
+an uploaded **file**, a **link** to Drive or Frame.io, or **pasted text**.
+
+Three roles: admin, co-founder, and clients scoped to their own channel.
+See [docs/ACCESS.md](docs/ACCESS.md).
 
 The client's **podcast channel name**, **email** and **YouTube channel** sit in the
 page heading. Status changes save the moment you pick them.
@@ -46,11 +53,13 @@ assets/css/app.css        styling (light + dark)
 assets/js/config.js       Supabase URL + anon key
 assets/js/store.js        data layer — Supabase or localStorage
 assets/js/app.js          UI, rendering, event wiring
-supabase/schema.sql       tables, enums, triggers, RLS policies
+supabase/schema.sql       base tables, enums, triggers, RLS
+supabase/schema-v2.sql    attachments, subgroups, approval, three roles
 scripts/build-config.js   regenerates config.js from env vars at deploy time
 vercel.json               Vercel build command + security headers
 docs/SETUP.md             Supabase + GitHub Pages setup
 docs/VERCEL.md            Vercel deployment + environment variables
+docs/ACCESS.md            who can see and do what, and how to grant it
 ```
 
 ## Deploying
