@@ -48,12 +48,26 @@ nothing at all.
 
 ### 2. Set their role
 
+Two addresses are on a bootstrap list in `handle_new_user()` and get their role
+automatically on first login — no SQL needed:
+
+| Address | Role | Display name |
+|---|---|---|
+| `apexideamarketing7@gmail.com` | admin | |
+| `shay999.in@gmail.com` | teammate | Shay |
+
+For anyone else:
+
 ```sql
 -- co-founder: everything except managing people
 update public.profiles set role = 'teammate' where email = 'them@example.com';
 ```
 
 Clients need no role change — `client` is already the default.
+
+To put another teammate on the bootstrap list, add their address to the
+`bootstrap_teammates` array in [`supabase/schema-v3.sql`](../supabase/schema-v3.sql)
+and re-run that file.
 
 ### 3. For clients, link them to their channel
 
@@ -120,3 +134,20 @@ The Copywriting column in the table is derived from its three subgroups by a
 database trigger: all done → Done, all untouched → Not started, anything else →
 In progress. It cannot be set directly, so the summary and the detail can never
 disagree.
+
+## Display names
+
+The tracker greets everyone by name — "Welcome, Shay". The name comes from
+`profiles.full_name`, resolved on first login in this order:
+
+1. a name supplied at signup
+2. the `known_names` map in `handle_new_user()` (this is what makes Shay "Shay"
+   rather than "Shay999 In")
+3. the email's local part, title-cased
+
+Anyone can change their own by clicking their name in the top bar.
+
+That goes through `set_display_name()` rather than a direct update, for the same
+reason as `set_approval()`: an UPDATE policy letting someone edit their own
+profile row would also let them edit their own `role`. The function touches one
+column and nothing else.

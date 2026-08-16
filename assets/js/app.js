@@ -13,6 +13,7 @@ const state = {
   user: null,
   role: null,
   staff: false,
+  name: '',
   clients: [],
   activeId: null,
   videos: [],
@@ -92,7 +93,7 @@ $('login-form').addEventListener('submit', async (e) => {
 
 $('sign-out').addEventListener('click', async () => {
   await auth.signOut();
-  Object.assign(state, { user: null, role: null, staff: false, activeId: null, expanded: new Set() });
+  Object.assign(state, { user: null, role: null, staff: false, name: '', activeId: null, expanded: new Set() });
   showLogin();
 });
 
@@ -100,12 +101,14 @@ $('sign-out').addEventListener('click', async () => {
 //  boot
 // ------------------------------------------------------------
 async function enterApp() {
-  state.role = await auth.currentRole();
+  const profile = await auth.currentProfile();
+  state.role  = profile?.role ?? null;
   state.staff = isStaff(state.role);
+  state.name  = profile?.full_name || '';
 
   $('login-view').hidden = true;
   $('app-view').hidden = false;
-  $('who').textContent = state.user?.email || '';
+  renderGreeting();
 
   const pill = $('mode-pill');
   pill.textContent = MODE === 'local' ? 'Local' : 'Live';
@@ -122,6 +125,29 @@ async function enterApp() {
 
   await loadClients();
 }
+
+// The greeting falls back through display name -> email local part ->
+// "there", so it never renders as "Welcome, undefined".
+function renderGreeting() {
+  const name = state.name || (state.user?.email || '').split('@')[0] || 'there';
+  const el = $('who');
+  el.textContent = `Welcome, ${name}`;
+  el.title = `Signed in as ${state.user?.email || ''} — click to change your name`;
+}
+
+$('who').addEventListener('click', () => {
+  openModal('Your name', `
+    <label for="f-dname">Display name</label>
+    <input id="f-dname" name="name" type="text" maxlength="60"
+           value="${esc(state.name)}" placeholder="e.g. Shay" />
+    <p class="hint">This is the name the tracker greets you by.</p>
+  `, async (data) => {
+    const saved = await auth.setDisplayName(data.name);
+    state.name = saved;
+    renderGreeting();
+    toast('Name updated.');
+  });
+});
 
 async function loadClients() {
   try {

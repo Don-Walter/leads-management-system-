@@ -134,15 +134,43 @@ export const auth = {
     return data?.session?.user ?? null;
   },
 
-  async currentRole() {
-    if (!sb) return 'admin';
+  // Role and display name come from the same row, so fetch once.
+  async currentProfile() {
+    if (!sb) {
+      const email = localStorage.getItem('pt-local-user') || '';
+      return {
+        role: 'admin',
+        full_name: localStorage.getItem('pt-local-name') || titleCase(email.split('@')[0]),
+      };
+    }
     const { data } = await sb.auth.getSession();
     const id = data?.session?.user?.id;
     if (!id) return null;
-    const { data: profile } = await sb.from('profiles').select('role').eq('id', id).single();
-    return profile?.role ?? null;
+    const { data: profile } = await sb
+      .from('profiles').select('role, full_name').eq('id', id).single();
+    return profile ?? null;
+  },
+
+  // Same reasoning as set_approval: an UPDATE policy on your own
+  // profile row would also let you edit your own role, so renaming
+  // goes through a function that touches one column.
+  async setDisplayName(name) {
+    if (!sb) {
+      const clean = (name || '').trim();
+      if (!clean) throw new Error('Name cannot be empty.');
+      localStorage.setItem('pt-local-name', clean);
+      return clean;
+    }
+    const { data, error } = await sb.rpc('set_display_name', { p_name: name });
+    if (error) throw error;
+    return data;
   },
 };
+
+function titleCase(s) {
+  return String(s || '').replace(/[._-]+/g, ' ').trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase()) || 'there';
+}
 
 // Staff can change the work; clients can only read it and approve.
 export const isStaff = (role) => role === 'admin' || role === 'teammate';

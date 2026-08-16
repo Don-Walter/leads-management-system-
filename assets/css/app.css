@@ -771,3 +771,21 @@ img.login-mark {
 /* controls inside the row keep their own cursor, since clicking them
    does something other than expanding */
 .v-row select, .v-row button, .v-row a { cursor: pointer; }
+
+/* ---------------- greeting ---------------- */
+button.who {
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 5px 9px;
+  cursor: pointer;
+  transition: background .14s, color .14s, border-color .14s;
+}
+button.who:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
