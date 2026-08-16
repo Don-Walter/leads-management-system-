@@ -628,7 +628,6 @@ label {
 button.btn-pill { cursor: pointer; background: transparent; font: inherit; }
 button.btn-pill:hover { background: rgba(255,255,255,.05); }
 
-.rollup-hint { font-size: 10.5px; color: var(--text-mute); margin-top: 4px; letter-spacing: .02em; }
 .v-sub.note { font-style: italic; max-width: 210px; }
 
 /* ---------------- expander ---------------- */

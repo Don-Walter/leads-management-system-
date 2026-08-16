@@ -289,8 +289,7 @@ function renderRows() {
       </td>
       <td>${statusControl(v.id, 'thumbnail_status', v.thumbnail_status, WORK_STATUS, canEdit)}</td>
       <td>${statusControl(v.id, 'intro_status', v.intro_status, WORK_STATUS, canEdit)}</td>
-      <td>${statusControl(v.id, 'copy_status', v.copy_status, WORK_STATUS, false)}
-          <div class="rollup-hint">from 3 subgroups</div></td>
+      <td>${statusControl(v.id, 'copy_status', v.copy_status, WORK_STATUS, false)}</td>
       <td>${statusControl(v.id, 'status', v.status, UPLOAD_STATUS, canEdit)}</td>
       <td>
         <button class="status-pill btn-pill ${TONE[approval]}" data-approve="${esc(v.id)}">
