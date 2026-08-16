@@ -48,6 +48,9 @@ export const APPROVAL_STATUS = [
 export const BLOCKS = [
   { key: 'thumbnail', field: 'thumbnail_status', label: 'Thumbnails' },
   { key: 'intro',     field: 'intro_status',     label: 'Intro' },
+  // One status per episode, not per clip — the individual shorts are
+  // attachments on this block, so six cuts sit under one status.
+  { key: 'shorts',    field: 'shorts_status',    label: 'Shorts' },
   {
     label: 'Copywriting',
     rollup: 'copy_status',
@@ -71,6 +74,7 @@ export const WORK_FIELDS = [
   { key: 'thumbnail_status', label: 'Thumbnails' },
   { key: 'intro_status', label: 'Intro' },
   { key: 'copy_status', label: 'Copywriting' },
+  { key: 'shorts_status', label: 'Shorts' },
 ];
 
 // ------------------------------------------------------------
@@ -103,7 +107,7 @@ const CLIENT_FIELDS = ['channel_name', 'email', 'youtube_url', 'notes', 'is_arch
 // from the three subgroups, so sending it would be ignored at best.
 const VIDEO_FIELDS = [
   'client_id', 'guest_name', 'title', 'episode_no', 'notes',
-  'thumbnail_status', 'intro_status',
+  'thumbnail_status', 'intro_status', 'shorts_status',
   'copy_titles_status', 'copy_description_status', 'copy_seo_status',
   'status', 'youtube_video_id', 'published_at', 'due_date', 'source',
 ];
@@ -235,6 +239,7 @@ export const videos = {
   async create(input) {
     const row = {
       thumbnail_status: 'not_started', intro_status: 'not_started',
+      shorts_status: 'not_started',
       copy_titles_status: 'not_started',
       copy_description_status: 'not_started', copy_seo_status: 'not_started',
       status: 'to_be_uploaded', source: 'manual',

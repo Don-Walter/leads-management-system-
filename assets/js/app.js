@@ -328,6 +328,7 @@ function renderRows() {
       <td>${statusControl(v.id, 'thumbnail_status', v.thumbnail_status, WORK_STATUS, canEdit)}</td>
       <td>${statusControl(v.id, 'intro_status', v.intro_status, WORK_STATUS, canEdit)}</td>
       <td>${statusControl(v.id, 'copy_status', v.copy_status, WORK_STATUS, false)}</td>
+      <td>${statusControl(v.id, 'shorts_status', v.shorts_status, WORK_STATUS, canEdit)}</td>
       <td>${statusControl(v.id, 'status', v.status, UPLOAD_STATUS, canEdit)}</td>
       <td>
         <button class="status-pill btn-pill ${TONE[approval]}" data-approve="${esc(v.id)}">
@@ -369,7 +370,7 @@ function detailRow(v, canEdit) {
        </div>`
     : section(b, false)).join('');
 
-  return `<tr class="detail-row"><td colspan="8">
+  return `<tr class="detail-row"><td colspan="9">
     <div class="detail">
       ${canEdit ? `<div class="detail-bar">
         <button class="btn btn-sm btn-ghost" data-edit-video="${esc(v.id)}">Edit details</button>
