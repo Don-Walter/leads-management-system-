@@ -318,10 +318,11 @@ function renderRows() {
              role="button" tabindex="0" aria-expanded="${open}">
       <td class="col-exp">
         <button class="expander ${open ? 'open' : ''}" data-exp="${esc(v.id)}"
-                aria-label="${open ? 'Collapse' : 'Expand'} ${esc(v.title)}">▸</button>
+                aria-label="${open ? 'Collapse' : 'Expand'} ${esc(v.guest_name || '')}">▸</button>
       </td>
       <td>
-        <div class="v-title">${esc(v.title)}</div>
+        <div class="v-title">${esc(v.guest_name || v.title || 'Untitled')}</div>
+        ${v.title ? `<div class="v-episode">${esc(v.title)}</div>` : ''}
         ${bits.length ? `<div class="v-sub">${bits.join(' · ')}</div>` : ''}
       </td>
       <td>${statusControl(v.id, 'thumbnail_status', v.thumbnail_status, WORK_STATUS, canEdit)}</td>
@@ -370,6 +371,9 @@ function detailRow(v, canEdit) {
 
   return `<tr class="detail-row"><td colspan="8">
     <div class="detail">
+      ${canEdit ? `<div class="detail-bar">
+        <button class="btn btn-sm btn-ghost" data-edit-video="${esc(v.id)}">Edit details</button>
+      </div>` : ''}
       ${body}
       ${v.notes ? `<div class="blk"><div class="blk-head"><span class="blk-name">Notes</span></div>
         <p class="att-note">${esc(v.notes)}</p></div>` : ''}
@@ -448,6 +452,9 @@ function wireRows() {
     });
   });
 
+  rows.querySelectorAll('[data-edit-video]').forEach((btn) =>
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openEditVideo(btn.dataset.editVideo); }));
+
   rows.querySelectorAll('[data-approve]').forEach((btn) =>
     btn.addEventListener('click', () => openApproval(btn.dataset.approve)));
 
@@ -480,7 +487,8 @@ function wireRows() {
   rows.querySelectorAll('[data-del]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const v = state.videos.find((x) => x.id === btn.dataset.del);
-      if (!confirm(`Delete "${v?.title}" and everything attached to it? This cannot be undone.`)) return;
+      if (!confirm(`Delete "${v?.guest_name || v?.title}" and everything attached to it?\n\n` +
+        'Every file, link and note on it goes too. This cannot be undone.')) return;
       try { await videos.remove(btn.dataset.del); await loadVideos(); toast('Video deleted.'); }
       catch (e) { toast(explain(e), true); }
     });
@@ -627,6 +635,41 @@ function openApproval(videoId) {
   });
 }
 
+function openEditVideo(id) {
+  const v = state.videos.find((x) => x.id === id);
+  if (!v) return;
+
+  openModal('Edit details', `
+    <label for="e-guest">Guest name</label>
+    <input id="e-guest" name="guest_name" type="text" required value="${esc(v.guest_name || '')}" />
+
+    <label for="e-title">Episode title <span class="opt">(once you have one)</span></label>
+    <input id="e-title" name="title" type="text" value="${esc(v.title || '')}" />
+
+    <div class="field-row">
+      <div><label for="e-ep">Episode no.</label>
+        <input id="e-ep" name="episode_no" type="number" min="0" value="${esc(v.episode_no ?? '')}" /></div>
+      <div><label for="e-due">Due date</label>
+        <input id="e-due" name="due_date" type="date" value="${esc(v.due_date || '')}" /></div>
+    </div>
+
+    <label for="e-vid">YouTube video ID</label>
+    <input id="e-vid" name="youtube_video_id" type="text" value="${esc(v.youtube_video_id || '')}" />
+
+    <label for="e-notes">Notes</label>
+    <textarea id="e-notes" name="notes">${esc(v.notes || '')}</textarea>
+  `, async (data) => {
+    if (!data.guest_name.trim()) throw new Error('Guest name is required.');
+    for (const k of ['title', 'episode_no', 'due_date', 'youtube_video_id', 'notes']) {
+      if (data[k] === '') data[k] = null;
+    }
+    const updated = await videos.update(id, data);
+    Object.assign(v, updated || data);
+    renderRows();
+    toast('Updated.');
+  });
+}
+
 // ------------------------------------------------------------
 //  clients + videos
 // ------------------------------------------------------------
@@ -665,8 +708,9 @@ $('edit-client-btn').addEventListener('click', () => {
 
 $('add-video-btn').addEventListener('click', () => {
   openModal('Add video', `
-    <label for="f-title">Video title</label>
-    <input id="f-title" name="title" type="text" required />
+    <label for="f-guest">Guest name</label>
+    <input id="f-guest" name="guest_name" type="text" required placeholder="e.g. Rob Brown" />
+    <p class="hint">The episode title gets added later, once the footage is in.</p>
     <div class="field-row">
       <div><label for="f-ep">Episode no.</label><input id="f-ep" name="episode_no" type="number" min="0" /></div>
       <div><label for="f-due">Due date</label><input id="f-due" name="due_date" type="date" /></div>
@@ -680,7 +724,7 @@ $('add-video-btn').addEventListener('click', () => {
     <label for="f-vnotes">Notes</label>
     <textarea id="f-vnotes" name="notes"></textarea>
   `, async (data) => {
-    if (!data.title.trim()) throw new Error('Video title is required.');
+    if (!data.guest_name.trim()) throw new Error('Guest name is required.');
     for (const k of ['episode_no', 'due_date', 'youtube_video_id', 'notes']) {
       if (data[k] === '') data[k] = null;
     }

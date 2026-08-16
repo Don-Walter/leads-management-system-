@@ -1,13 +1,17 @@
 # AIM Podcast Tracker
 
 A per-client production tracker for podcast channels. Pick a client, see every
-episode, and track each one across four blocks:
+episode, and track each one across four blocks.
+
+A video is identified by its **guest**, not a title — titles get written once the
+footage is in, so asking for one up front was asking too early. The episode
+title is optional and can be filled in later from **Edit details**.
 
 | Block | Values |
 |---|---|
 | **Thumbnails** | Not started · In progress · Done |
 | **Intro** | Not started · In progress · Done |
-| **Copywriting** | Description · SEO (each with a status) · Transcript (attachment only) |
+| **Copywriting** | Titles · Description · SEO (each with a status) · Transcript (attachment only) |
 | **Status** | To be uploaded · In process · Uploaded |
 | **Client approval** | Pending review · Cleared · Needs change |
 
