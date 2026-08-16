@@ -393,7 +393,11 @@ function attachmentList(videoId, block, canEdit) {
       main = `<button class="att-link" data-dl="${esc(a.id)}">${esc(name)}</button>
               <span class="att-meta">${esc(fileSize(a.size_bytes))}</span>`;
     } else if (a.kind === 'link') {
-      main = `<a class="att-link" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(name)}</a>`;
+      let host = '';
+      try { host = new URL(a.url).hostname.replace(/^www\./, ''); } catch { host = ''; }
+      main = `<a class="att-link" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer"
+                 title="${esc(a.url)}">${esc(name)}</a>${
+        host ? `<span class="att-meta">${esc(host)}</span>` : ''}`;
     } else {
       main = `<span class="att-link static">${esc(name)}</span>
               <p class="att-note">${esc(a.body)}</p>`;
@@ -463,12 +467,22 @@ function wireRows() {
     btn.addEventListener('click', () => openAttach(btn.dataset.addAtt, btn.dataset.block)));
 
   rows.querySelectorAll('[data-dl]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const a = state.attachments.find((x) => x.id === btn.dataset.dl);
+
+      // The tab has to be opened synchronously, while the click is still
+      // the active user gesture. Opening it after awaiting the signed URL
+      // gets blocked as a popup.
+      const tab = window.open('', '_blank', 'noopener');
       try {
         const url = await attachments.signedUrl(a.storage_path);
-        window.open(url, '_blank', 'noopener');
-      } catch (e) { toast(explain(e), true); }
+        if (tab) tab.location.href = url;
+        else window.location.href = url;      // popup blocked — go directly
+      } catch (err) {
+        if (tab) tab.close();
+        toast(explain(err), true);
+      }
     });
   });
 

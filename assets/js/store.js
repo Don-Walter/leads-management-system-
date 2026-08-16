@@ -313,6 +313,26 @@ function rollupCopy(v) {
 // ------------------------------------------------------------
 //  Attachments — a file, a link, or pasted text, on any block
 // ------------------------------------------------------------
+
+// People paste whatever is on their clipboard — a whole chat message,
+// a bare domain, a URL with a trailing full stop. Pull the actual link
+// out rather than storing the sentence and rendering a broken href.
+export function normaliseUrl(raw) {
+  const s = String(raw || '').trim();
+  if (!s) throw new Error('Paste a link first.');
+
+  // a real URL anywhere in the text wins
+  const found = s.match(/https?:\/\/[^\s<>"'`\]]+/i);
+  if (found) return found[0].replace(/[.,;:)\]]+$/, '');
+
+  // bare domain with no protocol — "drive.google.com/file/d/..."
+  if (/^(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:[/?#]\S*)?$/i.test(s)) {
+    return 'https://' + s;
+  }
+
+  throw new Error('That does not look like a link. Paste a URL starting with https://');
+}
+
 export const attachments = {
   supportsUpload: Boolean(sb),
 
@@ -326,7 +346,15 @@ export const attachments = {
   },
 
   async addLink(videoId, block, url, label) {
-    return insert({ video_id: videoId, block, kind: 'link', url: url.trim(), label: label?.trim() || null });
+    const clean = normaliseUrl(url);
+    // if they pasted a sentence and gave no label, the sentence is the
+    // most useful label we have
+    const leftover = String(url || '').replace(clean, '').replace(/[-–—\s]+$/, '').trim();
+    return insert({
+      video_id: videoId, block, kind: 'link',
+      url: clean,
+      label: label?.trim() || (leftover.length > 2 ? leftover.slice(0, 80) : null),
+    });
   },
 
   async addNote(videoId, block, body, label) {
