@@ -750,3 +750,24 @@ input[type=file]::file-selector-button {
 }
 .blk-head .btn { margin-left: auto; }
 .blk-head .status-pill { cursor: default; }
+
+/* ---------------- branding ---------------- */
+.brand { display: inline-flex; align-items: center; gap: 9px; }
+.brand-mark { display: block; width: 26px; height: 26px; flex: 0 0 auto; }
+
+img.login-mark {
+  display: block;
+  width: 52px; height: 52px;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 18px var(--accent-glow));
+}
+
+/* ---------------- whole row opens the detail ---------------- */
+.v-row { cursor: pointer; }
+.v-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* controls inside the row keep their own cursor, since clicking them
+   does something other than expanding */
+.v-row select, .v-row button, .v-row a { cursor: pointer; }

@@ -54,7 +54,10 @@ export const BLOCKS = [
     children: [
       { key: 'copy_description', field: 'copy_description_status', label: 'Description' },
       { key: 'copy_seo',         field: 'copy_seo_status',         label: 'SEO' },
-      { key: 'copy_transcript',  field: 'copy_transcript_status',  label: 'Transcript' },
+      // A transcript is either attached or it isn't — tracking it
+      // through Not started / In progress / Done says nothing extra,
+      // so this block is an attachment slot with no status control.
+      { key: 'copy_transcript',  label: 'Transcript', noStatus: true },
     ],
   },
 ];
@@ -100,7 +103,7 @@ const CLIENT_FIELDS = ['channel_name', 'email', 'youtube_url', 'notes', 'is_arch
 const VIDEO_FIELDS = [
   'client_id', 'title', 'episode_no', 'notes',
   'thumbnail_status', 'intro_status',
-  'copy_description_status', 'copy_seo_status', 'copy_transcript_status',
+  'copy_description_status', 'copy_seo_status',
   'status', 'youtube_video_id', 'published_at', 'due_date', 'source',
 ];
 
@@ -204,7 +207,6 @@ export const videos = {
     const row = {
       thumbnail_status: 'not_started', intro_status: 'not_started',
       copy_description_status: 'not_started', copy_seo_status: 'not_started',
-      copy_transcript_status: 'not_started',
       status: 'to_be_uploaded', source: 'manual',
       ...pick(input, VIDEO_FIELDS),
     };
@@ -264,9 +266,10 @@ export const videos = {
   },
 };
 
-// mirrors the roll_up_copy_status() trigger, for local mode
+// mirrors the roll_up_copy_status() trigger, for local mode.
+// Transcript is excluded: it has no status to roll up.
 function rollupCopy(v) {
-  const s = [v.copy_description_status, v.copy_seo_status, v.copy_transcript_status];
+  const s = [v.copy_description_status, v.copy_seo_status];
   if (s.every((x) => x === 'done')) return 'done';
   if (s.every((x) => x === 'not_started')) return 'not_started';
   return 'in_progress';

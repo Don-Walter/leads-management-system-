@@ -278,7 +278,8 @@ function renderRows() {
     const open = state.expanded.has(v.id);
     const approval = v.approval_status || 'pending';
 
-    return `<tr class="v-row ${open ? 'open' : ''}">
+    return `<tr class="v-row ${open ? 'open' : ''}" data-row="${esc(v.id)}"
+             role="button" tabindex="0" aria-expanded="${open}">
       <td class="col-exp">
         <button class="expander ${open ? 'open' : ''}" data-exp="${esc(v.id)}"
                 aria-label="${open ? 'Collapse' : 'Expand'} ${esc(v.title)}">▸</button>
@@ -314,7 +315,7 @@ function detailRow(v, canEdit) {
     <div class="blk ${nested ? 'nested' : ''}">
       <div class="blk-head">
         <span class="blk-name">${esc(leaf.label)}</span>
-        ${statusControl(v.id, leaf.field, v[leaf.field], WORK_STATUS, canEdit)}
+        ${leaf.noStatus ? '' : statusControl(v.id, leaf.field, v[leaf.field], WORK_STATUS, canEdit)}
         ${canEdit ? `<button class="btn btn-sm btn-ghost" data-add-att="${esc(v.id)}"
                       data-block="${leaf.key}">+ Add</button>` : ''}
       </div>
@@ -371,12 +372,24 @@ function attachmentList(videoId, block, canEdit) {
 function wireRows() {
   const rows = $('video-rows');
 
-  rows.querySelectorAll('[data-exp]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.exp;
-      state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
-      renderRows();
+  const toggle = (id) => {
+    state.expanded.has(id) ? state.expanded.delete(id) : state.expanded.add(id);
+    renderRows();
+  };
+
+  // Clicking anywhere on the row opens it, not just the arrow — but
+  // not when the click landed on a control, or the dropdown you were
+  // reaching for would collapse the row out from under you.
+  rows.querySelectorAll('.v-row').forEach((tr) => {
+    tr.addEventListener('click', (e) => {
+      if (e.target.closest('select, button, a, input, label')) return;
+      if (window.getSelection()?.toString()) return;   // let text selection be
+      toggle(tr.dataset.row);
     });
+  });
+
+  rows.querySelectorAll('[data-exp]').forEach((btn) => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(btn.dataset.exp); });
   });
 
   rows.querySelectorAll('.status-select').forEach((sel) => {

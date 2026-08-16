@@ -1,4 +1,4 @@
-# Podcast Client Tracker
+# AIM Podcast Tracker
 
 A per-client production tracker for podcast channels. Pick a client, see every
 episode, and track each one across four blocks:
@@ -7,7 +7,7 @@ episode, and track each one across four blocks:
 |---|---|
 | **Thumbnails** | Not started · In progress · Done |
 | **Intro** | Not started · In progress · Done |
-| **Copywriting** | Description · SEO · Transcript (each with its own status) |
+| **Copywriting** | Description · SEO (each with a status) · Transcript (attachment only) |
 | **Status** | To be uploaded · In process · Uploaded |
 | **Client approval** | Pending review · Cleared · Needs change |
 
@@ -53,6 +53,7 @@ assets/css/app.css        styling (light + dark)
 assets/js/config.js       Supabase URL + anon key
 assets/js/store.js        data layer — Supabase or localStorage
 assets/js/app.js          UI, rendering, event wiring
+assets/img/logo.svg       Apex Idea Marketing mark (topbar + login + favicon)
 supabase/schema.sql       base tables, enums, triggers, RLS
 supabase/schema-v2.sql    attachments, subgroups, approval, three roles
 scripts/build-config.js   regenerates config.js from env vars at deploy time

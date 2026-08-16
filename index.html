@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Podcast Client Tracker</title>
+<title>AIM Podcast Tracker</title>
 <link rel="stylesheet" href="assets/css/app.css" />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>" />
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg" />
 <script src="assets/js/config.js"></script>
 </head>
 <body>
@@ -13,8 +13,8 @@
 <!-- ========== login gate ========== -->
 <section id="login-view" class="login-view" hidden>
   <form class="login-card" id="login-form">
-    <div class="login-mark">🎙️</div>
-    <h1>Podcast Client Tracker</h1>
+    <img class="login-mark" src="assets/img/logo.svg" alt="Apex Idea Marketing" width="52" height="52" />
+    <h1>AIM Podcast Tracker</h1>
     <p class="login-sub">Admin sign in</p>
 
     <label for="login-email">Email</label>
@@ -34,7 +34,10 @@
 
   <header class="topbar">
     <div class="topbar-left">
-      <span class="brand">🎙️ Podcast Tracker</span>
+      <span class="brand">
+        <img class="brand-mark" src="assets/img/logo.svg" alt="" width="26" height="26" />
+        AIM Podcast Tracker
+      </span>
       <span class="mode-pill" id="mode-pill"></span>
       <span class="role-pill" id="role-pill"></span>
     </div>

@@ -123,16 +123,18 @@ comment on column public.videos.copy_status is
 
 -- copy_status stays as the single Copywriting cell in the table view,
 -- derived from its three subgroups so the two can never disagree.
+-- Transcript is deliberately excluded: it has no status of its own.
+-- A transcript is either attached or it is not, so tracking it through
+-- Not started / In progress / Done added a control that said nothing.
+-- The column stays for existing rows but no longer drives anything.
 create or replace function public.roll_up_copy_status()
 returns trigger language plpgsql as $$
 begin
   new.copy_status := case
     when new.copy_description_status = 'done'
-     and new.copy_seo_status         = 'done'
-     and new.copy_transcript_status  = 'done'        then 'done'
+     and new.copy_seo_status         = 'done'        then 'done'
     when new.copy_description_status = 'not_started'
-     and new.copy_seo_status         = 'not_started'
-     and new.copy_transcript_status  = 'not_started' then 'not_started'
+     and new.copy_seo_status         = 'not_started' then 'not_started'
     else 'in_progress'
   end;
   return new;
@@ -141,9 +143,12 @@ $$;
 
 drop trigger if exists videos_copy_rollup on public.videos;
 create trigger videos_copy_rollup
-  before insert or update of copy_description_status, copy_seo_status, copy_transcript_status
+  before insert or update of copy_description_status, copy_seo_status
   on public.videos
   for each row execute function public.roll_up_copy_status();
+
+-- recompute existing rows under the new rule
+update public.videos set copy_description_status = copy_description_status;
 
 
 -- ============================================================

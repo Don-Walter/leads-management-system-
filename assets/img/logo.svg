@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Apex Idea Marketing">
+  <defs>
+    <linearGradient id="aimGold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"   stop-color="#f7d268"/>
+      <stop offset=".42" stop-color="#e0a92a"/>
+      <stop offset=".72" stop-color="#c98f18"/>
+      <stop offset="1"   stop-color="#f2c230"/>
+    </linearGradient>
+    <linearGradient id="aimGoldSoft" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7d268"/>
+      <stop offset="1" stop-color="#c08715"/>
+    </linearGradient>
+  </defs>
+
+  <!-- outer blades -->
+  <path d="M31 47 L49 70 L42 154 Z"   fill="url(#aimGoldSoft)"/>
+  <path d="M169 47 L151 70 L158 154 Z" fill="url(#aimGoldSoft)"/>
+
+  <!-- central apex -->
+  <path d="M100 16 L152 156 L100 122 L48 156 Z" fill="url(#aimGold)"/>
+  <!-- bevel: catches the light on the left face -->
+  <path d="M100 16 L100 122 L48 156 Z" fill="#f7d268" opacity=".22"/>
+
+  <!-- inner mark -->
+  <path d="M85 127 L115 127 L100 174 Z" fill="url(#aimGoldSoft)"/>
+</svg>
