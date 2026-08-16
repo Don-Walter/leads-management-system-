@@ -95,6 +95,57 @@ $('login-form').addEventListener('submit', async (e) => {
   await enterApp();
 });
 
+$('forgot-btn').addEventListener('click', () => {
+  openModal('Reset your password', `
+    <label for="f-remail">Your email</label>
+    <input id="f-remail" name="email" type="email" required
+           value="${esc($('login-email').value.trim())}" />
+    <p class="hint">We'll email you a link to set a new password. It expires in an hour.</p>
+  `, async (data) => {
+    if (!data.email?.trim()) throw new Error('Enter your email first.');
+    await auth.requestPasswordReset(data.email);
+    // Never reveal whether an address has an account — that would let
+    // anyone test which emails are registered.
+    toast('If that email has an account, a reset link is on its way.');
+  });
+});
+
+// ---- arriving from a recovery email ----
+function showRecovery() {
+  $('login-view').hidden = true;
+  $('app-view').hidden = true;
+  $('recovery-view').hidden = false;
+  $('rec-pass').focus();
+}
+
+$('recovery-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('rec-submit'), err = $('rec-error');
+  err.hidden = true;
+
+  if ($('rec-pass').value !== $('rec-pass2').value) {
+    err.textContent = 'Those two do not match.';
+    err.hidden = false;
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await auth.updatePassword($('rec-pass').value);
+    // drop the recovery token out of the address bar
+    history.replaceState(null, '', location.pathname);
+    $('recovery-view').hidden = true;
+    state.user = await auth.currentUser();
+    await enterApp();
+    toast('Password updated. You are signed in.');
+  } catch (ex) {
+    err.textContent = explain(ex);
+    err.hidden = false;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save password';
+  }
+});
+
 $('sign-out').addEventListener('click', async () => {
   await auth.signOut();
   Object.assign(state, {
@@ -146,16 +197,28 @@ function renderGreeting() {
 }
 
 $('who').addEventListener('click', () => {
-  openModal('Your name', `
+  openModal('Your account', `
     <label for="f-dname">Display name</label>
     <input id="f-dname" name="name" type="text" maxlength="60"
            value="${esc(state.name)}" placeholder="e.g. Shay" />
-    <p class="hint">This is the name the tracker greets you by.</p>
+    <p class="hint">The name the tracker greets you by.</p>
+
+    <label for="f-pw1">New password <span class="opt">(leave blank to keep it)</span></label>
+    <input id="f-pw1" name="pw1" type="password" autocomplete="new-password" placeholder="At least 8 characters" />
+
+    <label for="f-pw2">Confirm new password</label>
+    <input id="f-pw2" name="pw2" type="password" autocomplete="new-password" />
   `, async (data) => {
-    const saved = await auth.setDisplayName(data.name);
-    state.name = saved;
-    renderGreeting();
-    toast('Name updated.');
+    const wantsPw = Boolean(data.pw1 || data.pw2);
+    if (wantsPw && data.pw1 !== data.pw2) throw new Error('Those two passwords do not match.');
+
+    if (data.name?.trim() && data.name.trim() !== state.name) {
+      state.name = await auth.setDisplayName(data.name);
+      renderGreeting();
+    }
+    if (wantsPw) await auth.updatePassword(data.pw1);
+
+    toast(wantsPw ? 'Password updated.' : 'Name updated.');
   });
 });
 
@@ -974,6 +1037,11 @@ $('add-person-btn').addEventListener('click', () => {
 //  start
 // ------------------------------------------------------------
 (async function init() {
+  // A recovery link carries a token that signs you in. Landing straight
+  // in the tracker would skip the whole point of the email.
+  if (auth.isRecovery && auth.isRecovery()) return showRecovery();
+  auth.onRecovery && auth.onRecovery(showRecovery);
+
   const user = await auth.currentUser();
   if (user) { state.user = user; await enterApp(); }
   else showLogin();

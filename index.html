@@ -24,8 +24,28 @@
     <input id="login-password" type="password" autocomplete="current-password" required />
 
     <button type="submit" class="btn btn-primary btn-block" id="login-submit">Sign in</button>
+    <button type="button" class="link-btn" id="forgot-btn">Forgot your password?</button>
     <p class="form-error" id="login-error" hidden></p>
     <p class="login-mode" id="login-mode"></p>
+  </form>
+</section>
+
+<!-- ========== password recovery ========== -->
+<section id="recovery-view" class="login-view" hidden>
+  <form class="login-card" id="recovery-form">
+    <img class="login-mark" src="assets/img/logo.svg" alt="Apex Idea Marketing" width="52" height="52" />
+    <h1>Set a new password</h1>
+    <p class="login-sub">Almost there</p>
+
+    <label for="rec-pass">New password</label>
+    <input id="rec-pass" type="password" autocomplete="new-password" required minlength="8" />
+
+    <label for="rec-pass2">Confirm it</label>
+    <input id="rec-pass2" type="password" autocomplete="new-password" required minlength="8" />
+
+    <button type="submit" class="btn btn-primary btn-block" id="rec-submit">Save password</button>
+    <p class="form-error" id="rec-error" hidden></p>
+    <p class="login-mode">At least 8 characters. You'll be signed in straight after.</p>
   </form>
 </section>
 

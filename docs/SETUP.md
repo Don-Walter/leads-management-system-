@@ -204,3 +204,41 @@ A classic token (<https://github.com/settings/tokens/new>) with the single `repo
 scope also works and has fewer moving parts, but it grants access to *every*
 repository on the account. The fine-grained one, scoped to this repo alone, is
 the better choice for a public project.
+
+---
+
+## Password reset
+
+Anyone can reset their own password from the login screen — **Forgot your
+password?** — or change it while signed in by clicking their name in the top bar.
+
+Two things have to be right for the emailed link to work:
+
+### Redirect URLs
+
+Supabase → **Authentication** → **URL Configuration**. The reset link returns
+people to whatever domain they started from, and Supabase refuses to redirect
+anywhere not on this list:
+
+```
+https://leads-management-system-sigma.vercel.app
+https://don-walter.github.io/leads-management-system-/
+http://localhost:4173
+```
+
+Set **Site URL** to the Vercel domain. Miss this and the link opens on an error
+page instead of the tracker.
+
+### Email delivery
+
+Supabase's built-in email sender is for development. It is rate limited to a
+handful of messages per hour across the whole project, and its messages
+routinely land in spam.
+
+For real use, add your own SMTP under **Project Settings** → **Authentication** →
+**SMTP Settings** — Resend, Postmark, SendGrid, or Google Workspace all work.
+Until then, expect resets to be slow, throttled, or filtered.
+
+If someone is locked out and the email is not arriving, you can always set a
+password for them directly: **Authentication** → **Users** → the ⋯ menu on their
+row → **Reset password**.

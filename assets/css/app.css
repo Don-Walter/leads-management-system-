@@ -919,3 +919,20 @@ button.who:hover {
   .tabs { order: 3; width: 100%; }
   .tab { flex: 1; }
 }
+
+/* ---------------- text button ---------------- */
+.link-btn {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-mute);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color .14s;
+}
+.link-btn:hover { color: var(--accent); text-decoration: underline; }

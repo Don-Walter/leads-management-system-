@@ -139,6 +139,36 @@ export const auth = {
     return data?.session?.user ?? null;
   },
 
+  // Sends a recovery email. The link lands back here with a recovery
+  // token in the URL fragment, which supabase-js picks up on load.
+  async requestPasswordReset(email) {
+    if (!sb) throw new Error('Password reset needs Supabase.');
+    const redirectTo = `${location.origin}${location.pathname}`;
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+    if (error) throw error;
+  },
+
+  // Works both for someone signed in and for someone who just arrived
+  // through a recovery link — either way there is a session to update.
+  async updatePassword(password) {
+    if (!sb) throw new Error('Changing your password needs Supabase.');
+    if ((password || '').length < 8) throw new Error('Use at least 8 characters.');
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) throw error;
+  },
+
+  // True when the page was opened from a password-recovery email.
+  isRecovery() {
+    return /[#&]type=recovery/.test(location.hash);
+  },
+
+  onRecovery(fn) {
+    if (!sb) return;
+    sb.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') fn();
+    });
+  },
+
   // Role and display name come from the same row, so fetch once.
   async currentProfile() {
     if (!sb) {
