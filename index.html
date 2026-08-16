@@ -40,6 +40,10 @@
       </span>
       <span class="mode-pill" id="mode-pill"></span>
       <span class="role-pill" id="role-pill"></span>
+      <nav class="tabs" id="tabs" hidden>
+        <button class="tab on" type="button" data-tab="tracker">Tracker</button>
+        <button class="tab" type="button" data-tab="people">People</button>
+      </nav>
     </div>
     <div class="topbar-right">
       <button class="who" id="who" type="button"></button>
@@ -101,6 +105,18 @@
       <div class="empty" id="empty-state"></div>
     </main>
   </div>
+
+  <!-- ---------- people ---------- -->
+  <section class="people-view" id="people-view" hidden>
+    <div class="people-head">
+      <div>
+        <h1>People</h1>
+        <p class="people-sub">Who can get into the tracker, and what they can see.</p>
+      </div>
+      <button class="btn btn-primary" id="add-person-btn">+ Add person</button>
+    </div>
+    <div id="people-content"></div>
+  </section>
 </div>
 
 <!-- ========== modal ========== -->

@@ -384,3 +384,78 @@ async function insert(row) {
   if (error) throw error;
   return data;
 }
+
+// ------------------------------------------------------------
+//  People — the roster, and access set up before someone joins
+//
+//  Creating the login itself happens in the Supabase dashboard.
+//  Everything else — role, display name, which channels a client
+//  sees — is recorded here first and applied on their first login.
+// ------------------------------------------------------------
+export const ROLES = [
+  { value: 'admin',    label: 'Admin',      hint: 'Everything, including managing people' },
+  { value: 'teammate', label: 'Co-founder', hint: 'Everything except managing people' },
+  { value: 'client',   label: 'Client',     hint: 'Read-only on their own channels, plus approval' },
+];
+
+export const roleLabel = (r) => ROLES.find((x) => x.value === r)?.label ?? r;
+
+export const people = {
+  async list() {
+    if (!sb) return [];
+    const { data, error } = await sb.rpc('list_people');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async setRole(userId, role) {
+    if (!sb) throw new Error('Managing people needs Supabase.');
+    const { error } = await sb.rpc('set_person_role', { p_user_id: userId, p_role: role });
+    if (error) throw error;
+  },
+
+  async setChannels(userId, clientIds) {
+    if (!sb) throw new Error('Managing people needs Supabase.');
+    const { error } = await sb.rpc('set_person_channels', {
+      p_user_id: userId, p_client_ids: clientIds,
+    });
+    if (error) throw error;
+  },
+
+  async revoke(userId) {
+    if (!sb) throw new Error('Managing people needs Supabase.');
+    const { error } = await sb.rpc('revoke_person', { p_user_id: userId });
+    if (error) throw error;
+  },
+};
+
+export const invites = {
+  // only the ones still waiting for an account to be created
+  async listPending() {
+    if (!sb) return [];
+    const { data, error } = await sb.from('invites').select('*')
+      .is('accepted_at', null).order('created_at');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create({ email, role, full_name, client_ids }) {
+    if (!sb) throw new Error('Managing people needs Supabase.');
+    const { data: sess } = await sb.auth.getSession();
+    const { data, error } = await sb.from('invites').upsert({
+      email: email.trim().toLowerCase(),
+      role,
+      full_name: full_name?.trim() || null,
+      client_ids: role === 'client' ? (client_ids || []) : [],
+      created_by: sess?.session?.user?.id ?? null,
+    }, { onConflict: 'email' }).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async remove(email) {
+    if (!sb) throw new Error('Managing people needs Supabase.');
+    const { error } = await sb.from('invites').delete().eq('email', email);
+    if (error) throw error;
+  },
+};

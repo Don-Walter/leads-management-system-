@@ -12,6 +12,7 @@ deliberately — access is granted, never defaulted.
 | Add / remove attachments | ✅ | ✅ | ❌ |
 | Download attachments | ✅ | ✅ | ✅ |
 | Set approval | ✅ | ✅ | ✅ |
+| See the People tab | ✅ | ✅ (read-only) | ❌ |
 | **Grant or revoke access** | ✅ | ❌ | ❌ |
 
 Managing people is yours alone. Your co-founder has full run of the work but
@@ -39,6 +40,19 @@ statuses. Instead they get no `UPDATE` policy at all, and this one
 the status, and writes only the approval fields.
 
 ## Adding someone
+
+The **People** tab in the tracker is the normal way to do this. It shows who has
+joined, their role, which channels each client can see, and when they were last
+active. Admins can change roles and channel access there directly.
+
+**Add person** records who someone will be *before* they exist. Fill in their
+email, name, role and — for clients — their channels. Then create the login in
+Supabase; everything you set is applied automatically on their first sign-in, and
+they move from "Waiting to join" to "Joined".
+
+Creating the login is the one step that stays in the Supabase dashboard.
+
+The SQL below does the same thing by hand, if you'd rather.
 
 ### 1. Create their login
 
@@ -151,3 +165,15 @@ That goes through `set_display_name()` rather than a direct update, for the same
 reason as `set_approval()`: an UPDATE policy letting someone edit their own
 profile row would also let them edit their own `role`. The function touches one
 column and nothing else.
+
+## Guard rails on managing people
+
+- You cannot demote yourself or revoke your own access. One wrong click would
+  otherwise leave the project with nobody who can grant access to anyone.
+- Promoting a client to staff clears their channel mappings, since staff see
+  everything and a stale mapping would be misleading.
+- **Revoke** drops someone to `client` with no channels — they keep their login
+  but see nothing. Deleting the login itself is a dashboard action, deliberately
+  kept out of the tracker.
+- Invite emails are lower-cased on write, so `Rob@Example.com` and
+  `rob@example.com` cannot become two different invites.

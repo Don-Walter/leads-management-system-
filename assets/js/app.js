@@ -3,8 +3,9 @@
 // ============================================================
 
 import {
-  MODE, auth, clients, videos, attachments, isStaff,
+  MODE, auth, clients, videos, attachments, people, invites, isStaff,
   WORK_STATUS, UPLOAD_STATUS, APPROVAL_STATUS, WORK_FIELDS, BLOCKS, LEAF_BLOCKS,
+  ROLES, roleLabel,
 } from './store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -19,6 +20,9 @@ const state = {
   videos: [],
   attachments: [],
   expanded: new Set(),
+  tab: 'tracker',
+  people: [],
+  invites: [],
 };
 
 // ------------------------------------------------------------
@@ -93,7 +97,11 @@ $('login-form').addEventListener('submit', async (e) => {
 
 $('sign-out').addEventListener('click', async () => {
   await auth.signOut();
-  Object.assign(state, { user: null, role: null, staff: false, name: '', activeId: null, expanded: new Set() });
+  Object.assign(state, {
+    user: null, role: null, staff: false, name: '', activeId: null,
+    expanded: new Set(), tab: 'tracker', people: [], invites: [],
+  });
+  showTab('tracker');
   showLogin();
 });
 
@@ -119,6 +127,8 @@ async function enterApp() {
   rolePill.className = 'role-pill ' + (state.role || 'none');
 
   // clients cannot create anything — hide rather than fail on click
+  $('tabs').hidden = !state.staff;      // clients have no roster to see
+  $('add-person-btn').hidden = state.role !== 'admin';
   $('add-client-btn').hidden = !state.staff;
   $('add-video-btn').hidden = !state.staff;
   $('edit-client-btn').hidden = !state.staff;
@@ -678,6 +688,226 @@ $('add-video-btn').addEventListener('click', () => {
     await videos.create(data);
     await loadVideos();
     toast('Video added.');
+  });
+});
+
+
+// ============================================================
+//  Tabs
+// ============================================================
+function showTab(tab) {
+  state.tab = tab;
+  $('tabs').querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  document.querySelector('.layout').hidden = tab !== 'tracker';
+  $('people-view').hidden = tab !== 'people';
+}
+
+$('tabs').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  showTab(btn.dataset.tab);
+  if (btn.dataset.tab === 'people') await loadPeople();
+});
+
+// ============================================================
+//  People
+// ============================================================
+async function loadPeople() {
+  try {
+    [state.people, state.invites] = await Promise.all([
+      people.list(),
+      invites.listPending(),
+    ]);
+  } catch (e) {
+    toast(explain(e), true);
+    state.people = []; state.invites = [];
+  }
+  renderPeople();
+}
+
+function relTime(iso) {
+  if (!iso) return null;
+  const mins = Math.floor((Date.now() - new Date(iso)) / 60000);
+  if (mins < 2) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d} day${d === 1 ? '' : 's'} ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function renderPeople() {
+  const isAdmin = state.role === 'admin';
+  const box = $('people-content');
+
+  const roleCell = (p) => {
+    if (!isAdmin || p.id === state.user?.id) {
+      return `<span class="role-tag ${esc(p.role)}">${esc(roleLabel(p.role))}${
+        p.id === state.user?.id ? ' · you' : ''}</span>`;
+    }
+    return `<select class="role-select" data-role-for="${esc(p.id)}">
+      ${ROLES.map((r) => `<option value="${r.value}" ${r.value === p.role ? 'selected' : ''}>${esc(r.label)}</option>`).join('')}
+    </select>`;
+  };
+
+  const channelCell = (p) => {
+    if (p.role !== 'client') return '<span class="dim">All channels</span>';
+    const names = (p.channels || []).map((c) => esc(c.name));
+    const body = names.length
+      ? names.map((n) => `<span class="chan-tag">${n}</span>`).join('')
+      : '<span class="warn">No channel yet — sees nothing</span>';
+    return `${body}${isAdmin ? `<button class="btn btn-sm btn-ghost chan-edit" data-chan-for="${esc(p.id)}">Edit</button>` : ''}`;
+  };
+
+  const joined = state.people.length ? `
+    <table class="people-table">
+      <thead><tr>
+        <th>Name</th><th>Email</th><th>Role</th><th>Channels</th><th>Last active</th><th></th>
+      </tr></thead>
+      <tbody>${state.people.map((p) => `
+        <tr>
+          <td><span class="p-name">${esc(p.full_name || '—')}</span>
+            ${!p.confirmed ? '<div class="warn sm">Not confirmed — cannot sign in</div>' : ''}</td>
+          <td class="dim">${esc(p.email)}</td>
+          <td>${roleCell(p)}</td>
+          <td class="chan-cell">${channelCell(p)}</td>
+          <td class="dim">${p.last_sign_in_at ? esc(relTime(p.last_sign_in_at)) : '<span class="warn">Never</span>'}</td>
+          <td>${isAdmin && p.id !== state.user?.id
+            ? `<button class="btn-icon" data-revoke="${esc(p.id)}" title="Revoke access">✕</button>` : ''}</td>
+        </tr>`).join('')}</tbody>
+    </table>` : '<p class="att-empty">Nobody has joined yet.</p>';
+
+  const pending = state.invites.length ? `
+    <h2 class="people-h2">Waiting to join</h2>
+    <p class="people-sub">Set up and ready. They appear above once their login is created and they sign in.</p>
+    <table class="people-table">
+      <thead><tr><th>Name</th><th>Email</th><th>Will be</th><th>Channels</th><th></th></tr></thead>
+      <tbody>${state.invites.map((i) => {
+        const names = (i.client_ids || [])
+          .map((id) => state.clients.find((c) => c.id === id)?.channel_name)
+          .filter(Boolean);
+        return `<tr class="pending">
+          <td><span class="p-name">${esc(i.full_name || '—')}</span></td>
+          <td class="dim">${esc(i.email)}</td>
+          <td><span class="role-tag ${esc(i.role)}">${esc(roleLabel(i.role))}</span></td>
+          <td>${i.role === 'client'
+            ? (names.length ? names.map((n) => `<span class="chan-tag">${esc(n)}</span>`).join('') : '<span class="warn">None</span>')
+            : '<span class="dim">All channels</span>'}</td>
+          <td>${isAdmin ? `<button class="btn-icon" data-uninvite="${esc(i.email)}" title="Cancel">✕</button>` : ''}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>` : '';
+
+  box.innerHTML = `
+    <h2 class="people-h2">Joined</h2>
+    ${joined}
+    ${pending}
+    ${isAdmin ? `<p class="people-foot">
+      Adding someone here sets up who they'll be. Their actual login still has to be
+      created in Supabase → Authentication → Users, with <strong>Auto Confirm User</strong> ticked.
+    </p>` : ''}`;
+
+  wirePeople();
+}
+
+function wirePeople() {
+  const box = $('people-content');
+
+  box.querySelectorAll('[data-role-for]').forEach((sel) => {
+    const before = sel.value;
+    sel.addEventListener('change', async () => {
+      try {
+        await people.setRole(sel.dataset.roleFor, sel.value);
+        toast('Role updated.');
+        await loadPeople();
+      } catch (e) { sel.value = before; toast(explain(e), true); }
+    });
+  });
+
+  box.querySelectorAll('[data-chan-for]').forEach((btn) =>
+    btn.addEventListener('click', () => openChannels(btn.dataset.chanFor)));
+
+  box.querySelectorAll('[data-revoke]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const p = state.people.find((x) => x.id === btn.dataset.revoke);
+      if (!confirm(`Revoke access for ${p.full_name || p.email}?\n\n` +
+        'They keep their login but will see nothing until you give them access again.')) return;
+      try { await people.revoke(p.id); toast('Access revoked.'); await loadPeople(); }
+      catch (e) { toast(explain(e), true); }
+    });
+  });
+
+  box.querySelectorAll('[data-uninvite]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(`Cancel the invite for ${btn.dataset.uninvite}?`)) return;
+      try { await invites.remove(btn.dataset.uninvite); toast('Invite cancelled.'); await loadPeople(); }
+      catch (e) { toast(explain(e), true); }
+    });
+  });
+}
+
+function channelChecklist(selected = []) {
+  if (!state.clients.length) return '<p class="hint">No channels exist yet.</p>';
+  return `<div class="chan-list">${state.clients.map((c) => `
+    <label class="chan-opt">
+      <input type="checkbox" name="client_ids" value="${esc(c.id)}"
+             ${selected.includes(c.id) ? 'checked' : ''} />
+      <span>${esc(c.channel_name)}</span>
+    </label>`).join('')}</div>`;
+}
+
+function openChannels(userId) {
+  const p = state.people.find((x) => x.id === userId);
+  const current = (p.channels || []).map((c) => c.id);
+
+  openModal(`Channels for ${p.full_name || p.email}`, `
+    <label>Which channels can they see?</label>
+    ${channelChecklist(current)}
+    <p class="hint">A client with no channels can sign in but sees an empty tracker.</p>
+  `, async () => {
+    const ids = [...$('modal-form').querySelectorAll('input[name="client_ids"]:checked')].map((i) => i.value);
+    await people.setChannels(userId, ids);
+    toast('Channels updated.');
+    await loadPeople();
+  });
+}
+
+$('add-person-btn').addEventListener('click', () => {
+  openModal('Add person', `
+    <label for="f-pemail">Email</label>
+    <input id="f-pemail" name="email" type="email" required placeholder="them@example.com" />
+
+    <label for="f-pname">Name</label>
+    <input id="f-pname" name="full_name" type="text" placeholder="e.g. Rob Brown" />
+
+    <label for="f-prole">Role</label>
+    <select id="f-prole" name="role">
+      ${ROLES.map((r) => `<option value="${r.value}" ${r.value === 'client' ? 'selected' : ''}>${esc(r.label)} — ${esc(r.hint)}</option>`).join('')}
+    </select>
+
+    <div id="chan-wrap">
+      <label>Channels they can see</label>
+      ${channelChecklist()}
+    </div>
+
+    <p class="hint"><strong>One more step after this.</strong> Create their login in
+    Supabase → Authentication → Users, with <strong>Auto Confirm User</strong> ticked.
+    Everything set here is applied the moment they first sign in.</p>
+  `, async (data) => {
+    if (!data.email?.trim()) throw new Error('Email is required.');
+    const ids = [...$('modal-form').querySelectorAll('input[name="client_ids"]:checked')].map((i) => i.value);
+    await invites.create({
+      email: data.email, role: data.role,
+      full_name: data.full_name, client_ids: ids,
+    });
+    toast('Added. Now create their login in Supabase.');
+    await loadPeople();
+  });
+
+  // channels only mean anything for clients
+  $('f-prole').addEventListener('change', (e) => {
+    $('chan-wrap').hidden = e.target.value !== 'client';
   });
 });
 
