@@ -43,7 +43,7 @@ export const APPROVAL_STATUS = [
 ];
 
 // The blocks a video is tracked across. Copywriting is a heading
-// with three children; everything else is a leaf. Attachments hang
+// with children; everything else is a leaf. Attachments hang
 // off leaves only, so there is never an ambiguous place to put a file.
 export const BLOCKS = [
   { key: 'thumbnail', field: 'thumbnail_status', label: 'Thumbnails' },
@@ -56,8 +56,9 @@ export const BLOCKS = [
     rollup: 'copy_status',
     children: [
       { key: 'copy_titles',      field: 'copy_titles_status',      label: 'Titles' },
-      { key: 'copy_description', field: 'copy_description_status', label: 'Description' },
-      { key: 'copy_seo',         field: 'copy_seo_status',         label: 'SEO' },
+      // SEO tags are written alongside the description, so they share a
+      // block rather than being tracked as separate work.
+      { key: 'copy_description', field: 'copy_description_status', label: 'Description & SEO Tags' },
       // A transcript is either attached or it isn't — tracking it
       // through Not started / In progress / Done says nothing extra,
       // so this block is an attachment slot with no status control.
@@ -104,11 +105,11 @@ function pick(obj, keys) {
 const CLIENT_FIELDS = ['channel_name', 'email', 'youtube_url', 'notes', 'is_archived'];
 
 // copy_status is intentionally absent: a database trigger derives it
-// from the three subgroups, so sending it would be ignored at best.
+// from its subgroups, so sending it would be ignored at best.
 const VIDEO_FIELDS = [
   'client_id', 'guest_name', 'title', 'episode_no', 'notes',
   'thumbnail_status', 'intro_status', 'shorts_status',
-  'copy_titles_status', 'copy_description_status', 'copy_seo_status',
+  'copy_titles_status', 'copy_description_status',
   'status', 'youtube_video_id', 'published_at', 'due_date', 'source',
 ];
 
@@ -271,7 +272,7 @@ export const videos = {
       thumbnail_status: 'not_started', intro_status: 'not_started',
       shorts_status: 'not_started',
       copy_titles_status: 'not_started',
-      copy_description_status: 'not_started', copy_seo_status: 'not_started',
+      copy_description_status: 'not_started',
       status: 'to_be_uploaded', source: 'manual',
       ...pick(input, VIDEO_FIELDS),
     };
@@ -334,7 +335,7 @@ export const videos = {
 // mirrors the roll_up_copy_status() trigger, for local mode.
 // Transcript is excluded: it has no status to roll up.
 function rollupCopy(v) {
-  const s = [v.copy_titles_status, v.copy_description_status, v.copy_seo_status];
+  const s = [v.copy_titles_status, v.copy_description_status];
   if (s.every((x) => x === 'done')) return 'done';
   if (s.every((x) => x === 'not_started')) return 'not_started';
   return 'in_progress';

@@ -119,8 +119,8 @@ where user_id = (select id from public.profiles where email = 'them@example.com'
 
 ## Attachments
 
-Every block — Thumbnails, Intro, and each of Description, SEO and Transcript —
-takes three kinds:
+Every block — Thumbnails, Intro, Shorts, and each of Titles, Description & SEO
+Tags and Transcript — takes three kinds:
 
 - **File** — uploaded to a private Supabase Storage bucket. 50 MB cap.
 - **Link** — Drive, Frame.io, Dropbox, anywhere. Better than uploading for large

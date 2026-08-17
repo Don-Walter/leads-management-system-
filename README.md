@@ -11,7 +11,7 @@ title is optional and can be filled in later from **Edit details**.
 |---|---|
 | **Thumbnails** | Not started · In progress · Done |
 | **Intro** | Not started · In progress · Done |
-| **Copywriting** | Titles · Description · SEO (each with a status) · Transcript (attachment only) |
+| **Copywriting** | Titles · Description & SEO Tags (each with a status) · Transcript (attachment only) |
 | **Shorts** | Not started · In progress · Done |
 | **Status** | To be uploaded · In process · Uploaded |
 | **Client approval** | Pending review · Cleared · Needs change |
