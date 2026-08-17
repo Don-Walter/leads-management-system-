@@ -3,7 +3,7 @@
 // ============================================================
 
 import {
-  MODE, auth, clients, videos, attachments, people, invites, notify, isStaff,
+  MODE, auth, clients, videos, attachments, people, invites, notify, live, isStaff,
   WORK_STATUS, UPLOAD_STATUS, APPROVAL_STATUS, WORK_FIELDS, BLOCKS, LEAF_BLOCKS,
   ROLES, roleLabel,
 } from './store.js';
@@ -24,6 +24,8 @@ const state = {
   people: [],
   invites: [],
   preview: false,      // staff looking at the tracker as a client would
+  unsubscribe: null,
+  pendingRefresh: false,
 };
 
 // ------------------------------------------------------------
@@ -177,10 +179,12 @@ $('recovery-form').addEventListener('submit', async (e) => {
 
 $('sign-out').addEventListener('click', async () => {
   await auth.signOut();
+  stopLive();
   sessionStorage.removeItem(GREETED_KEY);
   Object.assign(state, {
     user: null, role: null, staff: false, name: '', activeId: null,
     expanded: new Set(), tab: 'tracker', people: [], invites: [], preview: false,
+    unsubscribe: null, pendingRefresh: false,
   });
   showTab('tracker');
   showLogin();
@@ -721,7 +725,11 @@ function openModal(title, html, handler, saveLabel = 'Save') {
   $('modal-form').querySelector('input, textarea, select')?.focus();
 }
 
-function closeModal() { $('modal').hidden = true; onSave = null; }
+function closeModal() {
+  $('modal').hidden = true;
+  onSave = null;
+  if (state.pendingRefresh) refreshInPlace();
+}
 
 $('modal-cancel').addEventListener('click', closeModal);
 $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });

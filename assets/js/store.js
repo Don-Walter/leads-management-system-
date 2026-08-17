@@ -559,3 +559,38 @@ export const notify = {
     return data;
   },
 };
+
+// ------------------------------------------------------------
+//  Live updates
+//
+//  Supabase pushes row changes over a websocket, filtered through
+//  the subscriber's own RLS policies — so a client is told about
+//  their channel and nothing else, the same as when they query.
+//
+//  The callback fires for your own writes too. Reacting to those
+//  is harmless and keeps every tab consistent, but the caller
+//  should debounce rather than reload per event.
+// ------------------------------------------------------------
+export const live = {
+  supported: Boolean(sb),
+
+  subscribe(onChange) {
+    if (!sb) return () => {};
+
+    const channel = sb.channel('tracker-changes');
+    for (const table of ['videos', 'attachments', 'clients']) {
+      channel.on('postgres_changes',
+        { event: '*', schema: 'public', table },
+        (payload) => {
+          onChange({
+            table,
+            event: payload.eventType,
+            row: payload.new ?? payload.old ?? {},
+          });
+        });
+    }
+    channel.subscribe();
+
+    return () => { try { sb.removeChannel(channel); } catch { /* already gone */ } };
+  },
+};
