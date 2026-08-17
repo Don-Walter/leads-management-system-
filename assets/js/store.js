@@ -609,7 +609,9 @@ export const live = {
     }
 
     channel.subscribe((status, err) => {
-      onStatus?.(status, err);
+      // Pass the channel's own state through as well — supabase-js
+      // sometimes reports the reason there rather than in err.
+      onStatus?.(status, err, channel.state);
     });
 
     return () => {

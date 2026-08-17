@@ -1074,14 +1074,16 @@ async function startLive() {
       }
       scheduleRefresh();
     },
-    (status, err) => {
+    (status, err, detail) => {
       state.liveStatus = status;
       // A working connection should be invisible. Only speak up when it
-      // fails, otherwise "nothing changed" is indistinguishable from
-      // "nothing is arriving".
+      // fails — and say what failed, because "not connecting" on its own
+      // is not something anyone can act on.
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.warn('live updates unavailable:', status, err?.message || '');
-        toast('Live updates are not connecting — refresh to see other people\u2019s changes.', true);
+        const why = err?.message || err?.toString?.() || JSON.stringify(err ?? {});
+        console.warn('[live] status:', status, '\n[live] error:', why, '\n[live] detail:', detail ?? '(none)');
+        window.__liveDiag = { status, why, detail, at: new Date().toISOString() };
+        toast(`Live updates: ${status}${why && why !== '{}' ? ' — ' + why : ''}`, true);
       }
     });
 }
