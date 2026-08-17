@@ -936,3 +936,60 @@ button.who:hover {
   transition: color .14s;
 }
 .link-btn:hover { color: var(--accent); text-decoration: underline; }
+
+/* ============================================================
+   Welcome splash — shown briefly after signing in
+   ============================================================ */
+.welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background:
+    radial-gradient(760px 460px at 50% 42%, rgba(242, 194, 48, .10), transparent 68%),
+    var(--bg);
+  animation: welcome-in .45s ease-out both;
+}
+.welcome.leaving { animation: welcome-out .45s ease-in both; }
+
+.welcome-mark {
+  width: 72px; height: 72px;
+  filter: drop-shadow(0 0 30px var(--accent-glow));
+  animation: mark-rise .7s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.welcome-text {
+  font-size: clamp(30px, 6vw, 46px);
+  font-weight: 600;
+  letter-spacing: -.02em;
+  margin-top: 22px;
+  background: linear-gradient(96deg, var(--text) 22%, var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rise .7s .1s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.welcome-sub {
+  color: var(--text-mute);
+  font-size: 13px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-weight: 650;
+  margin: 10px 0 0;
+  animation: rise .7s .2s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes welcome-in  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes welcome-out { from { opacity: 1 } to { opacity: 0; visibility: hidden } }
+@keyframes rise      { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+@keyframes mark-rise { from { opacity: 0; transform: translateY(18px) scale(.9) } to { opacity: 1; transform: none } }
+
+/* the greeting still gets shown, it just appears rather than animates */
+@media (prefers-reduced-motion: reduce) {
+  .welcome, .welcome-mark, .welcome-text, .welcome-sub { animation: none; }
+}

@@ -92,7 +92,8 @@ $('login-form').addEventListener('submit', async (e) => {
   btn.disabled = false; btn.textContent = 'Sign in';
   if (error) { err.textContent = error.message; err.hidden = false; return; }
   state.user = user;
-  await enterApp();
+  sessionStorage.removeItem(GREETED_KEY);
+  await enterApp({ greet: true });
 });
 
 $('forgot-btn').addEventListener('click', () => {
@@ -148,6 +149,7 @@ $('recovery-form').addEventListener('submit', async (e) => {
 
 $('sign-out').addEventListener('click', async () => {
   await auth.signOut();
+  sessionStorage.removeItem(GREETED_KEY);
   Object.assign(state, {
     user: null, role: null, staff: false, name: '', activeId: null,
     expanded: new Set(), tab: 'tracker', people: [], invites: [],
@@ -156,10 +158,46 @@ $('sign-out').addEventListener('click', async () => {
   showLogin();
 });
 
+
+// ------------------------------------------------------------
+//  Welcome splash
+//
+//  Shown on sign-in, and once per browser tab thereafter. Showing
+//  it on every reload would turn a nice moment into a delay.
+// ------------------------------------------------------------
+const GREETED_KEY = 'pt-greeted';
+
+function welcomeSubtitle(role) {
+  return { admin: 'Apex Idea Marketing', teammate: 'Apex Idea Marketing' }[role]
+    || (state.clients[0]?.channel_name ?? '');
+}
+
+function showWelcome(name, role) {
+  return new Promise((resolve) => {
+    const el = $('welcome-view');
+    $('welcome-text').textContent = `Welcome, ${name}`;
+    $('welcome-sub').textContent = welcomeSubtitle(role);
+    el.classList.remove('leaving');
+    el.hidden = false;
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const hold = reduced ? 900 : 1700;
+
+    setTimeout(() => {
+      el.classList.add('leaving');
+      setTimeout(() => {
+        el.hidden = true;
+        el.classList.remove('leaving');
+        resolve();
+      }, reduced ? 0 : 450);
+    }, hold);
+  });
+}
+
 // ------------------------------------------------------------
 //  boot
 // ------------------------------------------------------------
-async function enterApp() {
+async function enterApp({ greet = false } = {}) {
   const profile = await auth.currentProfile();
   state.role  = profile?.role ?? null;
   state.staff = isStaff(state.role);
@@ -173,9 +211,15 @@ async function enterApp() {
   pill.textContent = MODE === 'local' ? 'Local' : 'Live';
   pill.className = 'mode-pill ' + (MODE === 'local' ? 'local' : 'live');
 
+  // Staff see what they are; a client is just themselves. The People
+  // tab still shows you that they're a client — this is only their view.
   const rolePill = $('role-pill');
-  rolePill.textContent = { admin: 'Admin', teammate: 'Team', client: 'Client' }[state.role] || 'No access';
-  rolePill.className = 'role-pill ' + (state.role || 'none');
+  const staffLabel = { admin: 'Admin', teammate: 'Team' }[state.role];
+  rolePill.hidden = !staffLabel;
+  if (staffLabel) {
+    rolePill.textContent = staffLabel;
+    rolePill.className = 'role-pill ' + state.role;
+  }
 
   // clients cannot create anything — hide rather than fail on click
   $('tabs').hidden = !state.staff;      // clients have no roster to see
@@ -185,6 +229,13 @@ async function enterApp() {
   $('edit-client-btn').hidden = !state.staff;
 
   await loadClients();
+
+  // greeting comes after the data loads, so the tracker is ready
+  // behind it rather than flashing empty when it clears
+  if (greet || !sessionStorage.getItem(GREETED_KEY)) {
+    sessionStorage.setItem(GREETED_KEY, '1');
+    await showWelcome(state.name || 'there', state.role);
+  }
 }
 
 // The greeting falls back through display name -> email local part ->

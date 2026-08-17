@@ -149,6 +149,15 @@ database trigger: all done → Done, all untouched → Not started, anything els
 In progress. It cannot be set directly, so the summary and the detail can never
 disagree.
 
+## What a client sees
+
+A client is never labelled one in their own view. The role badge is shown to
+staff only, so Rob signing in sees "Welcome, Rob" and no mention of being a
+client. The People tab still shows you his role — that page is staff-only.
+
+The welcome screen names his channel underneath, since a client belongs to one
+show; staff see the agency name instead.
+
 ## Display names
 
 The tracker greets everyone by name — "Welcome, Shay". The name comes from
