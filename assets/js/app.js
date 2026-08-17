@@ -651,15 +651,30 @@ function wireRows() {
       e.stopPropagation();
       const a = state.attachments.find((x) => x.id === btn.dataset.dl);
 
-      // The tab has to be opened synchronously, while the click is still
-      // the active user gesture. Opening it after awaiting the signed URL
-      // gets blocked as a popup.
-      const tab = window.open('', '_blank', 'noopener');
+      // Open the tab synchronously, while the click is still the active
+      // user gesture — doing it after awaiting the signed URL gets it
+      // blocked as a popup.
+      //
+      // NOT window.open(..., 'noopener'): that feature makes window.open
+      // return null, which previously looked like "popup blocked" and sent
+      // the tracker itself to the file. Sever the opener afterwards instead.
+      const tab = window.open('', '_blank');
+      if (tab) {
+        try { tab.opener = null; } catch { /* cross-origin, already safe */ }
+        tab.document.write(
+          '<title>Opening…</title><body style="background:#0a0908;color:#8a8171;' +
+          'font:15px -apple-system,Segoe UI,Roboto,sans-serif;display:grid;' +
+          'place-items:center;height:100vh;margin:0">Opening ' +
+          esc(a.file_name || 'file') + '…</body>');
+      }
+
       try {
         const url = await attachments.signedUrl(a.storage_path);
-        if (tab) tab.location.href = url;
-        else window.location.href = url;      // popup blocked — go directly
+        if (tab) tab.location.replace(url);
+        else toast('Your browser blocked the popup. Allow popups for this site and try again.', true);
       } catch (err) {
+        // Never navigate the tracker away on failure — that loses the page
+        // the person was working on.
         if (tab) tab.close();
         toast(explain(err), true);
       }
