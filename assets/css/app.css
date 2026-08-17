@@ -993,3 +993,40 @@ button.who:hover {
 @media (prefers-reduced-motion: reduce) {
   .welcome, .welcome-mark, .welcome-text, .welcome-sub { animation: none; }
 }
+
+/* ---------------- preview-as-client banner ---------------- */
+.preview-bar {
+  position: sticky;
+  top: 57px;
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 22px;
+  font-size: 13.5px;
+  color: #0f0d08;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dk));
+  border-bottom: 1px solid var(--accent-dk);
+}
+.preview-bar strong { font-weight: 700; }
+.preview-bar .btn {
+  margin-left: auto;
+  background: rgba(0, 0, 0, .82);
+  border-color: rgba(0, 0, 0, .3);
+  color: var(--accent);
+  font-weight: 600;
+}
+.preview-bar .btn:hover { background: #000; border-color: #000; }
+
+.preview-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #0f0d08;
+  animation: pulse 1.8s ease-in-out infinite;
+  flex: 0 0 auto;
+}
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+
+@media (max-width: 700px) {
+  .preview-bar { top: 0; position: static; flex-wrap: wrap; row-gap: 8px; padding: 10px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .preview-dot { animation: none } }

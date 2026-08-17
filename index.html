@@ -78,6 +78,12 @@
     </div>
   </header>
 
+  <div class="preview-bar" id="preview-bar" hidden>
+    <span class="preview-dot"></span>
+    <span>Viewing as a client of <strong id="preview-channel"></strong> — this is exactly what they see. Nothing can be changed.</span>
+    <button class="btn btn-sm" id="preview-exit">Exit preview</button>
+  </div>
+
   <div class="layout">
 
     <!-- ---------- clients sidebar ---------- -->
@@ -102,6 +108,7 @@
           </div>
         </div>
         <div class="client-head-actions">
+          <button class="btn btn-ghost btn-sm" id="preview-btn" hidden>👁 View as client</button>
           <button class="btn btn-ghost btn-sm" id="edit-client-btn">Edit</button>
           <button class="btn btn-primary btn-sm" id="add-video-btn">+ Add video</button>
         </div>

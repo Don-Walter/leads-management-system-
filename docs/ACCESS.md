@@ -149,6 +149,19 @@ database trigger: all done → Done, all untouched → Not started, anything els
 In progress. It cannot be set directly, so the summary and the detail can never
 disagree.
 
+## Seeing it for yourself
+
+**View as client** in the channel header renders the tracker exactly as that
+channel's client sees it: their one channel, read-only, no People tab, no role
+badge. A gold bar across the top makes it obvious you are in it.
+
+Every write is refused while it is on. The session underneath is still yours, so
+without that guard, approving something "as the client" would really approve it.
+
+It shows the *experience*, not the boundary. What a client can actually reach is
+enforced by Row Level Security in the database — proven by the role tests, not by
+this. A preview that hid buttons would prove nothing on its own.
+
 ## What a client sees
 
 A client is never labelled one in their own view. The role badge is shown to

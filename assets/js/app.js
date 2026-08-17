@@ -23,6 +23,7 @@ const state = {
   tab: 'tracker',
   people: [],
   invites: [],
+  preview: false,      // staff looking at the tracker as a client would
 };
 
 // ------------------------------------------------------------
@@ -42,6 +43,12 @@ const TONE_HEX = {
 };
 
 const labelOf = (opts, v) => opts.find((o) => o.value === v)?.label ?? v;
+
+// Preview mode renders exactly what a client gets. The session underneath
+// is still staff, so nothing may be written while it is on — otherwise you
+// would change real data while pretending to be someone who cannot.
+const canEdit = () => state.staff && !state.preview;
+const viewingAs = () => (state.preview ? 'client' : state.role);
 
 function fileSize(n) {
   if (!n && n !== 0) return '';
@@ -152,7 +159,7 @@ $('sign-out').addEventListener('click', async () => {
   sessionStorage.removeItem(GREETED_KEY);
   Object.assign(state, {
     user: null, role: null, staff: false, name: '', activeId: null,
-    expanded: new Set(), tab: 'tracker', people: [], invites: [],
+    expanded: new Set(), tab: 'tracker', people: [], invites: [], preview: false,
   });
   showTab('tracker');
   showLogin();
@@ -238,6 +245,31 @@ async function enterApp({ greet = false } = {}) {
   }
 }
 
+// Everything that shows or hides based on who is looking. Called on
+// entry and again whenever preview mode is toggled.
+function applyChrome() {
+  const role = viewingAs();
+  const editor = canEdit();
+
+  // Staff see what they are; a client is just themselves. The People
+  // tab still shows you that they're a client — this is only their view.
+  const rolePill = $('role-pill');
+  const staffLabel = { admin: 'Admin', teammate: 'Team' }[role];
+  rolePill.hidden = !staffLabel;
+  if (staffLabel) {
+    rolePill.textContent = staffLabel;
+    rolePill.className = 'role-pill ' + role;
+  }
+
+  $('tabs').hidden = !editor;           // clients have no roster to see
+  $('add-person-btn').hidden = state.role !== 'admin';
+  $('add-client-btn').hidden = !editor;
+  $('add-video-btn').hidden = !editor;
+  $('edit-client-btn').hidden = !editor;
+  $('preview-btn').hidden = !state.staff || state.preview;
+  $('preview-bar').hidden = !state.preview;
+}
+
 // The greeting falls back through display name -> email local part ->
 // "there", so it never renders as "Welcome, undefined".
 function renderGreeting() {
@@ -303,13 +335,18 @@ async function loadVideos() {
 // ------------------------------------------------------------
 function renderClientList() {
   const box = $('client-list');
-  if (!state.clients.length) {
-    box.innerHTML = `<p class="sidebar-empty">${state.staff
+  // a client is scoped to their channels, so preview shows just this one
+  const list = state.preview
+    ? state.clients.filter((c) => c.id === state.activeId)
+    : state.clients;
+
+  if (!list.length) {
+    box.innerHTML = `<p class="sidebar-empty">${canEdit()
       ? 'No clients yet.'
       : 'No channel has been shared with your account yet.'}</p>`;
     return;
   }
-  box.innerHTML = state.clients.map((c) => `
+  box.innerHTML = list.map((c) => `
     <button class="client-item ${c.id === state.activeId ? 'active' : ''}" data-id="${esc(c.id)}">
       <span class="ci-name">${esc(c.channel_name)}</span>
       ${c.email ? `<span class="ci-sub">${esc(c.email)}</span>` : ''}
@@ -337,7 +374,7 @@ function renderMain() {
   $('table-wrap').hidden = !has || !state.videos.length;
 
   if (!has) {
-    $('empty-state').innerHTML = state.staff
+    $('empty-state').innerHTML = canEdit()
       ? '<strong>No client selected</strong>Add a podcast client to start tracking episodes.'
       : '<strong>Nothing shared yet</strong>Ask your producer to give your account access to a channel.';
     return;
@@ -359,7 +396,7 @@ function renderMain() {
   if (state.videos.length) {
     renderStats(); renderRows(); $('empty-state').innerHTML = '';
   } else {
-    $('empty-state').innerHTML = state.staff
+    $('empty-state').innerHTML = canEdit()
       ? '<strong>No videos yet</strong>Add an episode to start tracking thumbnails, intro, copywriting and status.'
       : '<strong>No videos yet</strong>Nothing has been added to this channel.';
   }
@@ -414,7 +451,7 @@ function attachCount(videoId, block) {
 }
 
 function renderRows() {
-  const canEdit = state.staff;
+  const editable = canEdit();
 
   $('video-rows').innerHTML = state.videos.map((v) => {
     const bits = [];
@@ -439,11 +476,11 @@ function renderRows() {
         ${v.title ? `<div class="v-episode">${esc(v.title)}</div>` : ''}
         ${bits.length ? `<div class="v-sub">${bits.join(' · ')}</div>` : ''}
       </td>
-      <td>${statusControl(v.id, 'thumbnail_status', v.thumbnail_status, WORK_STATUS, canEdit)}</td>
-      <td>${statusControl(v.id, 'intro_status', v.intro_status, WORK_STATUS, canEdit)}</td>
+      <td>${statusControl(v.id, 'thumbnail_status', v.thumbnail_status, WORK_STATUS, editable)}</td>
+      <td>${statusControl(v.id, 'intro_status', v.intro_status, WORK_STATUS, editable)}</td>
       <td>${statusControl(v.id, 'copy_status', v.copy_status, WORK_STATUS, false)}</td>
-      <td>${statusControl(v.id, 'shorts_status', v.shorts_status, WORK_STATUS, canEdit)}</td>
-      <td>${statusControl(v.id, 'status', v.status, UPLOAD_STATUS, canEdit)}</td>
+      <td>${statusControl(v.id, 'shorts_status', v.shorts_status, WORK_STATUS, editable)}</td>
+      <td>${statusControl(v.id, 'status', v.status, UPLOAD_STATUS, editable)}</td>
       <td>
         <button class="status-pill btn-pill ${TONE[approval]}" data-approve="${esc(v.id)}">
           ${esc(labelOf(APPROVAL_STATUS, approval))}
@@ -451,9 +488,9 @@ function renderRows() {
         ${approval === 'needs_change' && v.approval_note
           ? `<div class="v-sub note">“${esc(v.approval_note)}”</div>` : ''}
       </td>
-      <td>${canEdit ? `<button class="btn-icon" data-del="${esc(v.id)}" title="Delete video">✕</button>` : ''}</td>
+      <td>${editable ? `<button class="btn-icon" data-del="${esc(v.id)}" title="Delete video">✕</button>` : ''}</td>
     </tr>
-    ${open ? detailRow(v, canEdit) : ''}`;
+    ${open ? detailRow(v, editable) : ''}`;
   }).join('');
 
   wireRows();
@@ -731,6 +768,7 @@ function openAttach(videoId, block) {
 //  approval modal — the one thing a client can change
 // ------------------------------------------------------------
 function openApproval(videoId) {
+  if (blockedInPreview()) return;
   const v = state.videos.find((x) => x.id === videoId);
   const current = v.approval_status || 'pending';
 
@@ -864,6 +902,49 @@ $('add-video-btn').addEventListener('click', () => {
   });
 });
 
+
+// ============================================================
+//  Preview as client
+//
+//  Renders the tracker exactly as a client sees it: their one
+//  channel, no editing, no People tab, no role badge. The session
+//  underneath is still yours, so every write is refused while it
+//  is on — this shows the experience, it does not become them.
+//
+//  What a client can actually *reach* is enforced by Row Level
+//  Security in the database, which this does not simulate and does
+//  not need to: the boundary is tested separately.
+// ============================================================
+function enterPreview() {
+  if (!state.activeId) return toast('Pick a channel first.', true);
+  state.preview = true;
+  state.expanded.clear();
+  showTab('tracker');
+  applyChrome();
+  renderClientList();
+  renderMain();
+  $('preview-channel').textContent =
+    state.clients.find((c) => c.id === state.activeId)?.channel_name || '';
+  window.scrollTo(0, 0);
+}
+
+function exitPreview() {
+  state.preview = false;
+  state.expanded.clear();
+  applyChrome();
+  renderClientList();
+  renderMain();
+}
+
+$('preview-btn').addEventListener('click', enterPreview);
+$('preview-exit').addEventListener('click', exitPreview);
+
+// Refuse anything that would write while previewing.
+function blockedInPreview() {
+  if (!state.preview) return false;
+  toast('Preview only — nothing is saved while viewing as a client.', true);
+  return true;
+}
 
 // ============================================================
 //  Tabs
