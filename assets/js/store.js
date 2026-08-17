@@ -574,8 +574,26 @@ export const notify = {
 export const live = {
   supported: Boolean(sb),
 
-  subscribe(onChange) {
+  // onStatus reports the subscription state, so a silent failure is
+  // visible instead of looking like "nothing ever changed".
+  async subscribe(onChange, onStatus) {
     if (!sb) return () => {};
+
+    // Postgres Changes are filtered through the subscriber's RLS
+    // policies, which means the websocket has to carry their token.
+    // Without this it connects as anon, every policy correctly denies,
+    // and no events arrive — with no error to explain why.
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.access_token) return () => {};
+    await sb.realtime.setAuth(session.access_token);
+
+    // A refreshed token must be handed over too, or the feed goes quiet
+    // an hour into a session.
+    const { data: sub } = sb.auth.onAuthStateChange((event, s) => {
+      if (event === 'TOKEN_REFRESHED' && s?.access_token) {
+        sb.realtime.setAuth(s.access_token);
+      }
+    });
 
     const channel = sb.channel('tracker-changes');
     for (const table of ['videos', 'attachments', 'clients']) {
@@ -589,8 +607,14 @@ export const live = {
           });
         });
     }
-    channel.subscribe();
 
-    return () => { try { sb.removeChannel(channel); } catch { /* already gone */ } };
+    channel.subscribe((status, err) => {
+      onStatus?.(status, err);
+    });
+
+    return () => {
+      try { sub?.subscription?.unsubscribe(); } catch { /* already gone */ }
+      try { sb.removeChannel(channel); } catch { /* already gone */ }
+    };
   },
 };

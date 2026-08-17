@@ -26,6 +26,7 @@ const state = {
   preview: false,      // staff looking at the tracker as a client would
   unsubscribe: null,
   pendingRefresh: false,
+  liveStatus: null,
 };
 
 // ------------------------------------------------------------
@@ -264,6 +265,7 @@ async function enterApp({ greet = false } = {}) {
   $('edit-client-btn').hidden = !state.staff;
 
   await loadClients();
+  startLive();          // async; nothing below depends on it
 
   // greeting comes after the data loads, so the tracker is ready
   // behind it rather than flashing empty when it clears
@@ -1017,6 +1019,77 @@ $('add-video-btn').addEventListener('click', () => {
     toast('Video added.');
   });
 });
+
+
+// ============================================================
+//  Live updates
+//
+//  Changes arrive in bursts — adding three shorts is three events —
+//  so refreshes are debounced rather than run per event. A refresh
+//  is also held while a dialog is open: reloading the page under
+//  someone mid-edit is worse than being a few seconds stale.
+// ============================================================
+let refreshTimer;
+
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(async () => {
+    if (!$('modal').hidden) { state.pendingRefresh = true; return; }
+    await refreshInPlace();
+  }, 600);
+}
+
+async function refreshInPlace() {
+  state.pendingRefresh = false;
+  const y = window.scrollY;
+  try {
+    state.clients = await clients.list();
+    if (state.activeId && !state.clients.some((c) => c.id === state.activeId)) {
+      state.activeId = state.clients[0]?.id ?? null;   // the one open was deleted
+    }
+    renderClientList();
+    if (state.activeId) {
+      state.videos = await videos.listByClient(state.activeId);
+      state.attachments = await attachments.listByVideos(state.videos.map((v) => v.id));
+    } else {
+      state.videos = []; state.attachments = [];
+    }
+    renderMain();
+    window.scrollTo(0, y);          // re-rendering the table must not jump the page
+  } catch (e) {
+    // A background refresh nobody asked for should fail quietly — what
+    // is already on screen is still what they had.
+    console.warn('live refresh failed:', e?.message || e);
+  }
+}
+
+async function startLive() {
+  if (!live.supported || state.unsubscribe) return;
+  state.unsubscribe = await live.subscribe(
+    (change) => {
+      // Ignore anything about a channel that is not on screen.
+      if (change.table !== 'clients') {
+        const cid = change.row?.client_id;
+        if (cid && cid !== state.activeId) return;
+      }
+      scheduleRefresh();
+    },
+    (status, err) => {
+      state.liveStatus = status;
+      // A working connection should be invisible. Only speak up when it
+      // fails, otherwise "nothing changed" is indistinguishable from
+      // "nothing is arriving".
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('live updates unavailable:', status, err?.message || '');
+        toast('Live updates are not connecting — refresh to see other people\u2019s changes.', true);
+      }
+    });
+}
+
+function stopLive() {
+  if (state.unsubscribe) { state.unsubscribe(); state.unsubscribe = null; }
+  clearTimeout(refreshTimer);
+}
 
 
 // ============================================================
