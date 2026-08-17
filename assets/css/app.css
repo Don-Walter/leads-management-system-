@@ -1030,3 +1030,8 @@ button.who:hover {
   .preview-bar { top: 0; position: static; flex-wrap: wrap; row-gap: 8px; padding: 10px 14px; }
 }
 @media (prefers-reduced-motion: reduce) { .preview-dot { animation: none } }
+
+/* ---------------- due dates ---------------- */
+.due { font-weight: 600; }
+.due.soon    { color: var(--amber); }
+.due.overdue { color: var(--red); }

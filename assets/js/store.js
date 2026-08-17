@@ -32,7 +32,7 @@ export const WORK_STATUS = [
 
 export const UPLOAD_STATUS = [
   { value: 'to_be_uploaded', label: 'To be uploaded' },
-  { value: 'in_process', label: 'In process' },
+  { value: 'in_process', label: 'In progress' },
   { value: 'uploaded', label: 'Uploaded' },
 ];
 

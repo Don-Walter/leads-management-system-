@@ -50,6 +50,22 @@ const labelOf = (opts, v) => opts.find((o) => o.value === v)?.label ?? v;
 const canEdit = () => state.staff && !state.preview;
 const viewingAs = () => (state.preview ? 'client' : state.role);
 
+// A due date is only worth flagging while the thing is still outstanding.
+// Once it is uploaded, "overdue" is noise.
+function dueLabel(v) {
+  if (!v.due_date) return null;
+  if (v.status === 'uploaded') return 'Due ' + esc(v.due_date);
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = new Date(v.due_date + 'T00:00:00');
+  const days = Math.round((due - today) / 86400000);
+
+  if (days < 0)  return `<span class="due overdue">Overdue by ${-days} day${days === -1 ? '' : 's'}</span>`;
+  if (days === 0) return '<span class="due soon">Due today</span>';
+  if (days <= 2) return `<span class="due soon">Due in ${days} day${days === 1 ? '' : 's'}</span>`;
+  return 'Due ' + esc(v.due_date);
+}
+
 function fileSize(n) {
   if (!n && n !== 0) return '';
   if (n < 1024) return n + ' B';
@@ -84,9 +100,14 @@ function explain(err) {
 function showLogin() {
   $('login-view').hidden = false;
   $('app-view').hidden = true;
-  $('login-mode').textContent = MODE === 'local'
+  // Nothing about the backend belongs on a screen a client sees. The
+  // local-mode warning stays, because that one is aimed at whoever is
+  // developing and says data is not really being saved.
+  const dev = MODE === 'local';
+  $('login-mode').hidden = !dev;
+  $('login-mode').textContent = dev
     ? 'Local mode — no Supabase key set, so data is saved in this browser only. Any email and password will get you in.'
-    : 'Connected to Supabase.';
+    : '';
 }
 
 $('login-form').addEventListener('submit', async (e) => {
@@ -214,9 +235,12 @@ async function enterApp({ greet = false } = {}) {
   $('app-view').hidden = false;
   renderGreeting();
 
+  // "Live" tells a client nothing and reads as debug output. Only the
+  // local-mode warning is worth showing, and only to whoever set it.
   const pill = $('mode-pill');
-  pill.textContent = MODE === 'local' ? 'Local' : 'Live';
-  pill.className = 'mode-pill ' + (MODE === 'local' ? 'local' : 'live');
+  pill.hidden = MODE !== 'local';
+  pill.textContent = 'Local';
+  pill.className = 'mode-pill local';
 
   // Staff see what they are; a client is just themselves. The People
   // tab still shows you that they're a client — this is only their view.
@@ -456,7 +480,8 @@ function renderRows() {
   $('video-rows').innerHTML = state.videos.map((v) => {
     const bits = [];
     if (v.episode_no != null && v.episode_no !== '') bits.push('Ep ' + esc(v.episode_no));
-    if (v.due_date) bits.push('Due ' + esc(v.due_date));
+    const due = dueLabel(v);
+    if (due) bits.push(due);
     if (v.youtube_video_id) bits.push(`<a href="https://youtu.be/${esc(v.youtube_video_id)}" target="_blank" rel="noopener">Watch</a>`);
 
     const files = LEAF_BLOCKS.reduce((n, b) => n + attachCount(v.id, b.key), 0);
