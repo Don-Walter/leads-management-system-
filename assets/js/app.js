@@ -1063,6 +1063,29 @@ async function refreshInPlace() {
   }
 }
 
+// Realtime is the fast path, not the only one. Polling is unglamorous
+// but it always works, so a failed websocket degrades to a few seconds
+// of latency rather than to nothing updating at all.
+const POLL_MS = 10000;
+let pollTimer;
+
+function startPolling(reason) {
+  if (pollTimer) return;
+  console.info('[live] falling back to polling every %ss (%s)', POLL_MS / 1000, reason);
+  pollTimer = setInterval(() => {
+    if (document.hidden) return;                    // nobody is looking
+    if (!$('modal').hidden) return;                 // mid-edit
+    const a = document.activeElement;
+    if (a && a.closest?.('#video-rows, #people-content')) return;  // mid-interaction
+    refreshInPlace();
+  }, POLL_MS);
+}
+
+function stopPolling() {
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
 async function startLive() {
   if (!live.supported) {
     window.__liveDiag = { status: 'NOT_SUPPORTED', why: 'local mode — no Supabase' };
@@ -1070,6 +1093,10 @@ async function startLive() {
   }
   if (state.unsubscribe) return;
   window.__liveDiag = { status: 'CONNECTING', why: null, at: new Date().toLocaleTimeString() };
+
+  // If the websocket has not confirmed within a few seconds, start
+  // polling anyway. If it confirms later, polling stops again.
+  setTimeout(() => { if (state.liveStatus !== 'SUBSCRIBED') startPolling('no confirmation'); }, 5000);
   state.unsubscribe = await live.subscribe(
     (change) => {
       // Ignore anything about a channel that is not on screen.
@@ -1092,11 +1119,16 @@ async function startLive() {
       // A working connection should be invisible. Only speak up when it
       // fails — and say what failed, because "not connecting" on its own
       // is not something anyone can act on.
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      if (status === 'SUBSCRIBED') {
+        stopPolling();                    // the fast path took over
+        return;
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'NO_SESSION') {
         const why = err?.message || err?.toString?.() || JSON.stringify(err ?? {});
-        console.warn('[live] status:', status, '\n[live] error:', why, '\n[live] detail:', detail ?? '(none)');
-        window.__liveDiag = { status, why, detail, at: new Date().toISOString() };
-        toast(`Live updates: ${status}${why && why !== '{}' ? ' — ' + why : ''}`, true);
+        console.warn('[live] websocket unavailable:', status, why, detail ?? '');
+        // No toast. The person gets working updates either way, so
+        // telling them about the transport is noise.
+        startPolling(status);
       }
     });
 }
@@ -1104,7 +1136,15 @@ async function startLive() {
 function stopLive() {
   if (state.unsubscribe) { state.unsubscribe(); state.unsubscribe = null; }
   clearTimeout(refreshTimer);
+  stopPolling();
 }
+
+// Coming back to a tab that has been in the background is the moment
+// stale data is most obvious, so refresh immediately rather than
+// waiting for the next tick.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.user && $('modal').hidden) refreshInPlace();
+});
 
 
 // ============================================================
