@@ -584,7 +584,12 @@ export const live = {
     // Without this it connects as anon, every policy correctly denies,
     // and no events arrive — with no error to explain why.
     const { data: { session } } = await sb.auth.getSession();
-    if (!session?.access_token) return () => {};
+    if (!session?.access_token) {
+      // Bailing here used to leave no trace at all, which is
+      // indistinguishable from a subscription that simply never fired.
+      onStatus?.('NO_SESSION', new Error('no access token at subscribe time'));
+      return () => {};
+    }
     await sb.realtime.setAuth(session.access_token);
 
     // A refreshed token must be handed over too, or the feed goes quiet

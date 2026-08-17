@@ -1064,7 +1064,12 @@ async function refreshInPlace() {
 }
 
 async function startLive() {
-  if (!live.supported || state.unsubscribe) return;
+  if (!live.supported) {
+    window.__liveDiag = { status: 'NOT_SUPPORTED', why: 'local mode — no Supabase' };
+    return;
+  }
+  if (state.unsubscribe) return;
+  window.__liveDiag = { status: 'CONNECTING', why: null, at: new Date().toLocaleTimeString() };
   state.unsubscribe = await live.subscribe(
     (change) => {
       // Ignore anything about a channel that is not on screen.
@@ -1076,6 +1081,14 @@ async function startLive() {
     },
     (status, err, detail) => {
       state.liveStatus = status;
+      // Recorded on every status, not only failures — otherwise
+      // "undefined" is ambiguous between "working" and "never ran".
+      window.__liveDiag = {
+        status,
+        why: err?.message || null,
+        detail: detail ?? null,
+        at: new Date().toLocaleTimeString(),
+      };
       // A working connection should be invisible. Only speak up when it
       // fails — and say what failed, because "not connecting" on its own
       // is not something anyone can act on.
