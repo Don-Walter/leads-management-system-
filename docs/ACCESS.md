@@ -199,3 +199,27 @@ column and nothing else.
   kept out of the tracker.
 - Invite emails are lower-cased on write, so `Rob@Example.com` and
   `rob@example.com` cannot become two different invites.
+
+## Notifications
+
+Outbound updates are deliberate. Work happening in the tracker is **logged**,
+not emailed — pressing **Notify…** in an expanded row is what sends it.
+
+The panel shows everything that has changed since the last time anyone notified
+about that episode, a tick list of who can be told, and an optional note. The
+client is ticked by default; staff are not, since you are both in the tracker
+already. It refuses to send if nothing has changed and no note was written.
+
+Two things stay automatic, because they are the cases where waiting for a human
+to press a button would break the loop:
+
+- **A client's verdict.** Rob approves or requests changes and the team hears
+  immediately. He will never press Notify to pass that on.
+- **Deadline reminders.** Forgetting is the exact problem they exist to solve.
+
+This also means a client never sees half-finished work land in their inbox. You
+attach a rough cut, nothing happens; you press Notify when it is genuinely ready.
+
+Recipients are validated server-side — `notify_now()` silently drops anyone
+picked who cannot see that channel, so a stale UI can never leak an update to
+the wrong client.

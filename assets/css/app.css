@@ -1035,3 +1035,29 @@ button.who:hover {
 .due { font-weight: 600; }
 .due.soon    { color: var(--amber); }
 .due.overdue { color: var(--red); }
+
+/* ---------------- notify panel ---------------- */
+.detail-bar { gap: 8px; }
+
+.chg-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 4px;
+  max-height: 300px; overflow-y: auto;
+}
+.chg-list li {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 13px; line-height: 1.4;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 7px;
+  padding: 7px 10px;
+}
+.chg-list li span:first-child { flex: 1; min-width: 0; }
+.chg-when { color: var(--text-mute); font-size: 11.5px; white-space: nowrap; }
+
+.chan-role {
+  color: var(--text-mute); font-size: 11.5px; font-weight: 500;
+  margin-left: 7px; text-transform: none; letter-spacing: 0;
+}
+.chan-opt.is-muted { opacity: .5; cursor: not-allowed; }

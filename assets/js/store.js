@@ -524,3 +524,37 @@ export const invites = {
     if (error) throw error;
   },
 };
+
+// ------------------------------------------------------------
+//  Notify — deliberate, outbound updates
+//
+//  Staff decide when work is worth telling someone about. What a
+//  client does still reaches the team automatically, because they
+//  will never press a button to pass it on.
+// ------------------------------------------------------------
+export const notify = {
+  // Who can be told about this channel, minus yourself
+  async recipients(clientId) {
+    if (!sb) return [];
+    const { data, error } = await sb.rpc('notify_recipients', { p_client_id: clientId });
+    if (error) throw error;
+    return data || [];
+  },
+
+  // What has happened since the last time anyone pressed Notify
+  async pending(videoId) {
+    if (!sb) return [];
+    const { data, error } = await sb.rpc('pending_changes', { p_video_id: videoId });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async send(videoId, userIds, note) {
+    if (!sb) throw new Error('Notifying needs Supabase.');
+    const { data, error } = await sb.rpc('notify_now', {
+      p_video_id: videoId, p_user_ids: userIds, p_note: note || null,
+    });
+    if (error) throw error;
+    return data;
+  },
+};

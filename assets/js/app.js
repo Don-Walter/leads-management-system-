@@ -3,7 +3,7 @@
 // ============================================================
 
 import {
-  MODE, auth, clients, videos, attachments, people, invites, isStaff,
+  MODE, auth, clients, videos, attachments, people, invites, notify, isStaff,
   WORK_STATUS, UPLOAD_STATUS, APPROVAL_STATUS, WORK_FIELDS, BLOCKS, LEAF_BLOCKS,
   ROLES, roleLabel,
 } from './store.js';
@@ -550,6 +550,7 @@ function detailRow(v, canEdit) {
     <div class="detail">
       ${canEdit ? `<div class="detail-bar">
         <button class="btn btn-sm btn-ghost" data-edit-video="${esc(v.id)}">Edit details</button>
+        <button class="btn btn-sm btn-primary" data-notify="${esc(v.id)}">Notify…</button>
       </div>` : ''}
       ${body}
       ${v.notes ? `<div class="blk"><div class="blk-head"><span class="blk-name">Notes</span></div>
@@ -633,6 +634,9 @@ function wireRows() {
     });
   });
 
+  rows.querySelectorAll('[data-notify]').forEach((btn) =>
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openNotify(btn.dataset.notify); }));
+
   rows.querySelectorAll('[data-edit-video]').forEach((btn) =>
     btn.addEventListener('click', (e) => { e.stopPropagation(); openEditVideo(btn.dataset.editVideo); }));
 
@@ -691,10 +695,12 @@ function wireRows() {
 // ------------------------------------------------------------
 let onSave = null;
 
-function openModal(title, html, handler) {
+function openModal(title, html, handler, saveLabel = 'Save') {
   $('modal-title').textContent = title;
   $('modal-form').innerHTML = html;
   $('modal-error').hidden = true;
+  $('modal-save').textContent = saveLabel;
+  $('modal-save').dataset.label = saveLabel;
   $('modal').hidden = false;
   onSave = handler;
   $('modal-form').querySelector('input, textarea, select')?.focus();
@@ -714,10 +720,12 @@ $('modal-save').addEventListener('click', async () => {
   if (!onSave) return;
   const data = Object.fromEntries(new FormData($('modal-form')).entries());
   const btn = $('modal-save');
-  btn.disabled = true; btn.textContent = 'Saving…';
+  const label = btn.dataset.label || 'Save';
+  btn.disabled = true;
+  btn.textContent = label === 'Send' ? 'Sending…' : 'Saving…';
   try { await onSave(data); closeModal(); }
   catch (e) { $('modal-error').textContent = explain(e); $('modal-error').hidden = false; }
-  finally { btn.disabled = false; btn.textContent = 'Save'; }
+  finally { btn.disabled = false; btn.textContent = label; }
 });
 
 // ------------------------------------------------------------
@@ -825,6 +833,66 @@ function openApproval(videoId) {
     $('note-wrap').hidden = e.target.value !== 'needs_change';
     if (!$('note-wrap').hidden) $('f-note').focus();
   });
+}
+
+// ------------------------------------------------------------
+//  Notify panel
+// ------------------------------------------------------------
+async function openNotify(videoId) {
+  if (blockedInPreview()) return;
+  const v = state.videos.find((x) => x.id === videoId);
+  if (!v) return;
+
+  let recipients = [], changes = [];
+  try {
+    [recipients, changes] = await Promise.all([
+      notify.recipients(state.activeId),
+      notify.pending(videoId),
+    ]);
+  } catch (e) { return toast(explain(e), true); }
+
+  if (!recipients.length) {
+    return toast('Nobody else has access to this channel yet.', true);
+  }
+
+  const when = (iso) => new Date(iso).toLocaleDateString(undefined,
+    { day: 'numeric', month: 'short' });
+
+  openModal(`Notify about ${v.guest_name}`, `
+    ${changes.length ? `
+      <label>Since the last update</label>
+      <ul class="chg-list">
+        ${changes.map((c) => `<li><span>${esc(c.summary)}</span>
+          <span class="chg-when">${esc(when(c.created_at))}</span></li>`).join('')}
+      </ul>`
+    : `<p class="hint">Nothing has changed since the last update — write a note below
+        if you still want to send something.</p>`}
+
+    <label>Send to</label>
+    <div class="chan-list">
+      ${recipients.map((r) => `
+        <label class="chan-opt ${r.muted ? 'is-muted' : ''}">
+          <input type="checkbox" name="who" value="${esc(r.id)}"
+                 ${r.role === 'client' && !r.muted ? 'checked' : ''}
+                 ${r.muted ? 'disabled' : ''} />
+          <span>${esc(r.full_name || r.email)}
+            <span class="chan-role">${esc(roleLabel(r.role))}</span>
+            ${r.muted ? '<span class="chan-role">muted</span>' : ''}</span>
+        </label>`).join('')}
+    </div>
+
+    <label for="f-note-msg">Add a note <span class="opt">(optional)</span></label>
+    <textarea id="f-note-msg" name="note" rows="3"
+      placeholder="e.g. Thumbnails are ready for your approval."></textarea>
+  `, async (data) => {
+    const who = [...$('modal-form').querySelectorAll('input[name="who"]:checked')]
+      .map((i) => i.value);
+    if (!who.length) throw new Error('Pick at least one person.');
+
+    const n = await notify.send(videoId, who, data.note);
+    v.last_notified_at = new Date().toISOString();
+    toast(`Sent to ${n} ${n === 1 ? 'person' : 'people'}.`);
+  }, 'Send');
 }
 
 function openEditVideo(id) {
